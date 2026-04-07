@@ -69,6 +69,8 @@ private:
 	float MoveInput = 0.0f;
 	float TurnInput = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input", meta =(AllowPrivateAccess = "true"))
+
+	// testing different ways of writing access, this should allow private members to show in blueprints 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Movement", meta =(AllowPrivateAccess = "true"))
 	float TestSpeedInput = 0.0f;
 };
