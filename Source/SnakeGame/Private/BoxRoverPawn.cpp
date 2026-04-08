@@ -52,6 +52,8 @@ void ABoxRoverPawn::BeginPlay()
 	Super::BeginPlay();
 
 	//if (APlayerController* PlayerController = Cast<APlayerController>(GetWorld()->GetFirstPlayerController()))
+
+	// should set up PlayerController and Input mappings
 	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 	{
 		if (ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer())
@@ -66,8 +68,6 @@ void ABoxRoverPawn::BeginPlay()
 			}
 		}
 	}
-
-	// should set up PlayerController and Input mappings
 }
 
 // Called every frame
