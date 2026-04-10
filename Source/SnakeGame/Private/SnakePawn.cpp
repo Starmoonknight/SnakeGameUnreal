@@ -5,7 +5,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
-#include "Components//SphereComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -37,7 +37,7 @@ ASnakePawn::ASnakePawn()
 	SpringArm->bDoCollisionTest = false;
 	SpringArm->bInheritPitch = false;
 	SpringArm->bInheritRoll = false;
-	SpringArm->bInheritYaw = false;
+	SpringArm->bInheritYaw = true;
 
 	// look into enable lagg for smooth spring arm turn
 
@@ -75,14 +75,123 @@ void ASnakePawn::BeginPlay()
 void ASnakePawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	UpdateRotationFromInput(DeltaTime);
+	MoveTick(DeltaTime);
 }
 
 // Called to bind functionality to input
 void ASnakePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		/* NOTE: could use BindActionInstanceLambda to call the methods. 
+		// Example:
+		EnhancedInput->BindActionInstanceLambda(
+		TurnLeftAction,
+		ETriggerEvent::Started,
+		[this](const FInputActionInstance&)
+		{
+			TurnLeft(true);
+		});
+		*/
+
+		if (TurnLeftAction)
+		{
+			EnhancedInput->BindAction(TurnLeftAction, ETriggerEvent::Started, this, &ASnakePawn::OnTurnLeftStarted);
+			EnhancedInput->BindAction(TurnLeftAction, ETriggerEvent::Completed, this, &ASnakePawn::OnTurnLeftReleased);
+			EnhancedInput->BindAction(TurnLeftAction, ETriggerEvent::Canceled, this, &ASnakePawn::OnTurnLeftReleased);
+		}
+
+		if (TurnRightAction)
+		{
+			EnhancedInput->BindAction(TurnRightAction, ETriggerEvent::Started, this, &ASnakePawn::OnTurnRightStarted);
+			EnhancedInput->BindAction(TurnRightAction, ETriggerEvent::Completed, this,
+			                          &ASnakePawn::OnTurnRightReleased);
+			EnhancedInput->BindAction(TurnRightAction, ETriggerEvent::Canceled, this, &ASnakePawn::OnTurnRightReleased);
+		}
+	}
 }
 
-void ASnakePawn::Turn(const FInputActionValue& Value)
+
+void ASnakePawn::OnTurnLeftStarted(const FInputActionValue& Value)
 {
+	bLeftHeld = true;
+	LeftPressOrder = ++PressSequenceCounter;
+}
+
+void ASnakePawn::OnTurnLeftReleased(const FInputActionValue& Value)
+{
+	bLeftHeld = false;
+	LeftPressOrder = INDEX_NONE;
+	// not needed but cleaner? Also means press order is only meaningful while the key is held 
+}
+
+void ASnakePawn::OnTurnRightStarted(const FInputActionValue& Value)
+{
+	bRightHeld = true;
+	RightPressOrder = ++PressSequenceCounter;
+}
+
+void ASnakePawn::OnTurnRightReleased(const FInputActionValue& Value)
+{
+	bRightHeld = false;
+	RightPressOrder = INDEX_NONE;
+}
+
+float ASnakePawn::ResolveConflictDirection(const ETurnPriorityMode& PriorityMode) const
+{
+	switch (PriorityMode)
+	{
+	case ETurnPriorityMode::FirstPress:
+		return (LeftPressOrder < RightPressOrder) ? -1.0f : 1.0f;
+
+	case ETurnPriorityMode::LastPress:
+		return (LeftPressOrder > RightPressOrder) ? -1.0f : 1.0f;
+
+	case ETurnPriorityMode::ExclusiveInput:
+	default:
+		return 0.0f;
+	}
+}
+
+float ASnakePawn::GetTurnDirection() const
+{
+	if (!bLeftHeld && !bRightHeld)
+	{
+		return 0.0f;
+	}
+
+	if (bLeftHeld && !bRightHeld)
+	{
+		return -1.0f;
+	}
+
+	if (!bLeftHeld && bRightHeld)
+	{
+		return 1.0f;
+	}
+
+	// If both buttons are held down at same time 
+	return ResolveConflictDirection(TurnPriorityMode);
+}
+
+void ASnakePawn::UpdateRotationFromInput(float DeltaTime)
+{
+	const float TurnDirection = GetTurnDirection();
+	if (TurnDirection == 0.0f)
+	{
+		return;
+	}
+
+	const float YawDelta = TurnDirection * BaseTurnRateDegPerSec * DeltaTime;
+	AddActorLocalRotation(FRotator(0.0f, YawDelta, 0.0f));
+}
+
+void ASnakePawn::MoveTick(float DeltaTime)
+{
+	const FVector Delta = GetActorForwardVector() * BaseMoveSpeed * DeltaTime;
+	AddActorWorldOffset(Delta, true);
 }

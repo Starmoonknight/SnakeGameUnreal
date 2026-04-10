@@ -15,6 +15,16 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 
+
+UENUM(BlueprintType)
+enum class ETurnPriorityMode : uint8
+{
+	FirstPress,
+	LastPress,
+	ExclusiveInput
+};
+
+
 UCLASS()
 class SNAKEGAME_API ASnakePawn : public APawn
 {
@@ -36,7 +46,17 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 private:
-	void Turn(const FInputActionValue& Value);
+	void OnTurnLeftStarted(const FInputActionValue& Value);
+	void OnTurnLeftReleased(const FInputActionValue& Value);
+
+	void OnTurnRightStarted(const FInputActionValue& Value);
+	void OnTurnRightReleased(const FInputActionValue& Value);
+
+	float ResolveConflictDirection(const ETurnPriorityMode& PriorityMode) const;
+	float GetTurnDirection() const;
+
+	void UpdateRotationFromInput(float DeltaTime);
+	void MoveTick(float DeltaTime);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SnakeBody|Component",
 		meta = (AllowPrivateAccess = "true"))
@@ -60,15 +80,38 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
 		meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> TurnAction;
+	TObjectPtr<UInputAction> TurnLeftAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> TurnRightAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
+		meta = (AllowPrivateAccess = "true"))
+	ETurnPriorityMode TurnPriorityMode = ETurnPriorityMode::LastPress;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Movement", meta = (AllowPrivateAccess = "true"))
 	float BaseMoveSpeed = 500.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Movement", meta = (AllowPrivateAccess = "true"))
-	float BaseTurnSpeed = 120.0f;
+	float BaseTurnRateDegPerSec = 120.0f;
 
-	float TurnInput = 0.0f;
+
+	bool bLeftHeld = false;
+	bool bRightHeld = false;
+
+	uint32 LeftPressOrder = INDEX_NONE;
+	uint32 RightPressOrder = INDEX_NONE;
+	uint32 PressSequenceCounter = 0;
+
+
+	// not used yet
+	FVector CurrentPosition = FVector::ZeroVector;
+	FVector PendingNextPosition = FVector::ZeroVector;
+
+	// not used yet
+	FRotator CurrentRotation = FRotator::ZeroRotator;
+	FRotator PendingNextRotation = FRotator::ZeroRotator;
 
 
 	/*
