@@ -127,6 +127,7 @@ void ASnakeGridwalkerPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+
 	UpdateTurnVisual(DeltaTime);
 
 	StepAccumulator += DeltaTime;
@@ -219,6 +220,14 @@ bool ASnakeGridwalkerPawn::TryConsumeGrowth()
 	return true;
 }
 
+FVector ASnakeGridwalkerPawn::CellToWorld(const FIntPoint Cell) const
+{
+	return FVector(
+		Cell.X * CellSize,
+		Cell.Y * CellSize,
+		GetActorLocation().Z);
+}
+
 float ASnakeGridwalkerPawn::DirectionToYaw(EGridDirection Direction)
 {
 	switch (Direction)
@@ -291,24 +300,24 @@ void ASnakeGridwalkerPawn::ApplyPendingDirection()
 	PendingNextDirection = EGridDirection::None;
 }
 
+
 FIntPoint ASnakeGridwalkerPawn::PeekNextHeadCell() const
 {
+	return GridPosition + GridDelta(CurrentDirection);
 }
 
-void ASnakeGridwalkerPawn::AdvanceHead()
+void ASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
 {
-	GridPosition += GridDelta(CurrentDirection);
-
-	const FVector WorldLocation(
-		GridPosition.X * CellSize,
-		GridPosition.Y * CellSize,
-		GetActorLocation().Z);
-
-	SetActorLocation(WorldLocation);
+	SetActorLocation(CellToWorld(NextHeadCell));
 }
 
 void ASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
 {
+	if (BodyCells.IsEmpty())
+	{
+		return;
+	}
+
 	for (int32 i = 0; i < BodyCells.Num(); ++i)
 	{
 		const FIntPoint OldSegmentCell = BodyCells[i];
@@ -321,14 +330,23 @@ void ASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 {
 	ApplyPendingDirection();
 
-	FIntPoint PreviousHeadCell = GridPosition;
-	FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridPosition;
+	const FIntPoint NextHeadCell = PeekNextHeadCell();
 
-	AdvanceHead();
+	// later:
+	// if (!CanEnterCell(NextHeadCell)) { handle death/block; return; }
+
+	const FIntPoint PreviousHeadCell = GridPosition;
+	const FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridPosition;
+
+	// --- Update logic state, ---
+	GridPosition = NextHeadCell;
 	AdvanceBodySegments(PreviousHeadCell);
 
 	if (TryConsumeGrowth())
 	{
 		BodyCells.Add(PreviousTailCell);
 	}
+
+	// --- Update Visual / World-Sync after all logic ---
+	UpdateHeadWorldLocation(NextHeadCell);
 }

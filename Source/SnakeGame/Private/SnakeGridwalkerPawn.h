@@ -59,8 +59,9 @@ private:
 
 	static EGridDirection ResolveDirectionFromInput(const FVector2D& Input);
 	void OnMoveInput(const FInputActionValue& Value);
-
 	bool TryConsumeGrowth();
+
+	FVector CellToWorld(const FIntPoint Cell) const;
 
 	static float DirectionToYaw(EGridDirection Direction);
 	void StartTurnVisual(EGridDirection NewDirection);
@@ -69,7 +70,7 @@ private:
 	void ApplyPendingDirection();
 	FIntPoint PeekNextHeadCell() const;
 
-	void AdvanceHead();
+	void UpdateHeadWorldLocation(const FIntPoint& NextHeadCell);
 	void AdvanceBodySegments(FIntPoint VacatedCell);
 	void AdvanceSnakeOneStep();
 
