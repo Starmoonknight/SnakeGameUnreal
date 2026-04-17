@@ -98,24 +98,24 @@ void ABoxRoverPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 	{
 		if (MoveAction)
 		{
-			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ABoxRoverPawn::Move);
-			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Completed, this, &ABoxRoverPawn::Move);
+			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ABoxRoverPawn::OnMoveInput);
+			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Completed, this, &ABoxRoverPawn::OnMoveInput);
 		}
 
 		if (TurnAction)
 		{
-			EnhancedInput->BindAction(TurnAction, ETriggerEvent::Triggered, this, &ABoxRoverPawn::Turn);
-			EnhancedInput->BindAction(TurnAction, ETriggerEvent::Completed, this, &ABoxRoverPawn::Turn);
+			EnhancedInput->BindAction(TurnAction, ETriggerEvent::Triggered, this, &ABoxRoverPawn::OnTurnInput);
+			EnhancedInput->BindAction(TurnAction, ETriggerEvent::Completed, this, &ABoxRoverPawn::OnTurnInput);
 		}
 	}
 }
 
-void ABoxRoverPawn::Move(const FInputActionValue& Value)
+void ABoxRoverPawn::OnMoveInput(const FInputActionValue& Value)
 {
 	MoveInput = Value.Get<float>();
 }
 
-void ABoxRoverPawn::Turn(const FInputActionValue& Value)
+void ABoxRoverPawn::OnTurnInput(const FInputActionValue& Value)
 {
 	TurnInput = Value.Get<float>();
 }

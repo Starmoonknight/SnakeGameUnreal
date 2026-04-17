@@ -28,8 +28,8 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	void Move(const FInputActionValue& Value);
-	void Turn(const FInputActionValue& Value);
+	void OnMoveInput(const FInputActionValue& Value);
+	void OnTurnInput(const FInputActionValue& Value);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SnakeBody|Components")
 	TObjectPtr<USphereComponent> CollisionSphere;
