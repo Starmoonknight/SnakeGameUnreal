@@ -133,7 +133,7 @@ void ASnakeGridwalkerPawn::Tick(float DeltaTime)
 	if (StepAccumulator >= StepInterval)
 	{
 		StepAccumulator -= StepInterval;
-		StepMove();
+		AdvanceSnakeOneStep();
 	}
 }
 
@@ -274,8 +274,9 @@ void ASnakeGridwalkerPawn::UpdateTurnVisual(float DeltaTime)
 	}
 }
 
-void ASnakeGridwalkerPawn::AdvanceHead()
+void ASnakeGridwalkerPawn::ApplyPendingDirection()
 {
+	// Assign heading direction, and update rotation if direction changed
 	if (PendingNextDirection != EGridDirection::None &&
 		!Reversing(CurrentDirection, PendingNextDirection))
 	{
@@ -286,9 +287,16 @@ void ASnakeGridwalkerPawn::AdvanceHead()
 		CurrentDirection = PendingNextDirection;
 	}
 
-	// consume active input
+	// consume active direction-change input
 	PendingNextDirection = EGridDirection::None;
+}
 
+FIntPoint ASnakeGridwalkerPawn::PeekNextHeadCell() const
+{
+}
+
+void ASnakeGridwalkerPawn::AdvanceHead()
+{
 	GridPosition += GridDelta(CurrentDirection);
 
 	const FVector WorldLocation(
@@ -309,8 +317,10 @@ void ASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
 	}
 }
 
-void ASnakeGridwalkerPawn::StepMove()
+void ASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 {
+	ApplyPendingDirection();
+
 	FIntPoint PreviousHeadCell = GridPosition;
 	FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridPosition;
 

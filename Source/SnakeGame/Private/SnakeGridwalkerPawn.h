@@ -26,7 +26,7 @@ enum class EGridDirection : uint8
 	Down,
 	Left,
 	Right,
-	None
+	None // None = no valid input this step, remember to not use as a pause or add more choices 
 };
 
 
@@ -66,9 +66,12 @@ private:
 	void StartTurnVisual(EGridDirection NewDirection);
 	void UpdateTurnVisual(float DeltaTime);
 
+	void ApplyPendingDirection();
+	FIntPoint PeekNextHeadCell() const;
+
 	void AdvanceHead();
 	void AdvanceBodySegments(FIntPoint VacatedCell);
-	void StepMove();
+	void AdvanceSnakeOneStep();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SnakeBody|Assets",
 		meta = (AllowPrivateAccess = "true")) // place for actually assigning the mesh used
