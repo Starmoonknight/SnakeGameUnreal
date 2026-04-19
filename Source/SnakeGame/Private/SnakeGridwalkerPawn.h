@@ -52,21 +52,32 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	void ResetSnake();
+
 	void RequestGrowth(int32 Amount = 1);
 
+	const TArray<FIntPoint>& GetBodyCells() const;
+	bool TryGetBodyCell(int32 Index, FIntPoint& OutCell) const;
+
 private:
-	void OnGrowPressed(const FInputActionValue& Value);
+	FIntPoint WorldToCell(const FVector& WorldLocation) const;
+	FVector CellToWorld(const FIntPoint Cell) const;
+	FTransform MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const;
 
 	static EGridDirection ResolveDirectionFromInput(const FVector2D& Input);
 	void OnMoveInput(const FInputActionValue& Value);
+	void OnGrowPressed();
+	void OnResetPressed();
+
+	void StartHeadTurnVisual(EGridDirection NewDirection);
+	void UpdateHeadTurnVisual(float DeltaTime);
+
+
+	void AddBodyVisualSegment(const FIntPoint& BodyCell);
+	void UpdateBodyVisualTransforms();
+	void SyncBodyVisuals();
+
 	bool TryConsumeGrowth();
-
-	FVector CellToWorld(const FIntPoint Cell) const;
-
-	static float DirectionToYaw(EGridDirection Direction);
-	void StartTurnVisual(EGridDirection NewDirection);
-	void UpdateTurnVisual(float DeltaTime);
-
 	void ApplyPendingDirection();
 	FIntPoint PeekNextHeadCell() const;
 
@@ -120,6 +131,10 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> TestGrowthAction;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> TestResetAction;
+
 	/*
 	Reminder:
 	May later switch from direct time values to speed-based tuning.
@@ -153,9 +168,20 @@ private:
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", UIMin = "0.01"))
 	float TurnDuration = 0.15f;
 
-	float CellSize = 100.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
+		meta = (AllowPrivateAccess = "true"))
 	FVector2D GridOrigin = FVector2D::ZeroVector;
-	FIntPoint GridPosition = FIntPoint::ZeroValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
+		meta = (AllowPrivateAccess = "true"))
+	float GridWorldZ = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
+		meta = (AllowPrivateAccess = "true"))
+	FIntPoint SpawnCell = FIntPoint::ZeroValue;
+
+	float CellSize = 100.0f;
+	FIntPoint GridCellPosition = FIntPoint::ZeroValue;
 
 	bool IsAlive = true;
 
@@ -172,7 +198,7 @@ private:
 
 	FVector2D RawMoveInput = FVector2D::ZeroVector;
 	EGridDirection CurrentDirection = EGridDirection::Up;
-	EGridDirection PendingNextDirection = EGridDirection::Up;
+	EGridDirection PendingNextDirection = EGridDirection::None;
 
 
 	//TArray<TWeakObjectPtr<>>

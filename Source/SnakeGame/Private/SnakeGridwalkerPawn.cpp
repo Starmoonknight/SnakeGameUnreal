@@ -40,6 +40,23 @@ namespace
 			(CurrentDirection == EGridDirection::Right && NextDirection == EGridDirection::Left) ||
 			(CurrentDirection == EGridDirection::Left && NextDirection == EGridDirection::Right);
 	}
+
+	float DirectionToYaw(const EGridDirection Direction)
+	{
+		switch (Direction)
+		{
+		case EGridDirection::Up:
+			return 0.0f; // +X forward
+		case EGridDirection::Right:
+			return 90.0f; // +Y right
+		case EGridDirection::Down:
+			return 180.0f; // -X back
+		case EGridDirection::Left:
+			return -90.0f; // -Y left
+		default:
+			return 0.0f;
+		}
+	}
 }
 
 
@@ -52,7 +69,7 @@ ASnakeGridwalkerPawn::ASnakeGridwalkerPawn()
 	// Collision Sphere is the root object
 	CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
 	SetRootComponent(CollisionSphere);
-	CollisionSphere->SetSphereRadius(50.f);
+	CollisionSphere->SetSphereRadius(45.f);
 
 	// attach the VisualMesh to the sphere
 	VisualMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualMesh"));
@@ -82,29 +99,35 @@ void ASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	if (VisualMesh)
+	if (VisualMesh && HeadMeshAsset)
 	{
 		VisualMesh->SetStaticMesh(HeadMeshAsset);
-		if (HeadMeshAsset)
+		if (HeadMaterialAsset)
 		{
 			VisualMesh->SetMaterial(0, HeadMaterialAsset);
 		}
 	}
 
-	if (VisualSegmentMesh)
+
+	if (VisualSegmentMesh && SegmentMeshAsset)
 	{
 		VisualSegmentMesh->SetStaticMesh(SegmentMeshAsset);
-		if (SegmentMeshAsset)
+		if (SegmentMaterialAsset)
 		{
 			VisualSegmentMesh->SetMaterial(0, SegmentMaterialAsset);
 		}
 	}
+
+	SpawnCell = WorldToCell(GetActorLocation());
+	GridWorldZ = GetActorLocation().Z;
 }
 
 // Called when the game starts or when spawned
 void ASnakeGridwalkerPawn::BeginPlay()
 {
 	Super::BeginPlay();
+
+	ResetSnake();
 
 	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 	{
@@ -114,6 +137,7 @@ void ASnakeGridwalkerPawn::BeginPlay()
 				UEnhancedInputLocalPlayerSubsystem>())
 			{
 				if (DefaultMappingContext)
+
 				{
 					InputSubsystem->AddMappingContext(DefaultMappingContext, 0);
 				}
@@ -127,11 +151,11 @@ void ASnakeGridwalkerPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-
-	UpdateTurnVisual(DeltaTime);
+	UpdateHeadTurnVisual(DeltaTime);
 
 	StepAccumulator += DeltaTime;
-	if (StepAccumulator >= StepInterval)
+	// using while instead of if case should make the movement work even if laggy and low fps? 
+	while (StepAccumulator >= StepInterval)
 	{
 		StepAccumulator -= StepInterval;
 		AdvanceSnakeOneStep();
@@ -161,17 +185,98 @@ void ASnakeGridwalkerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 			EnhancedInput->BindAction(TestGrowthAction, ETriggerEvent::Started, this,
 			                          &ASnakeGridwalkerPawn::OnGrowPressed);
 		}
+
+		if (TestResetAction)
+		{
+			EnhancedInput->BindAction(TestResetAction, ETriggerEvent::Started, this,
+			                          &ASnakeGridwalkerPawn::OnResetPressed);
+		}
 	}
 }
 
-void ASnakeGridwalkerPawn::RequestGrowth(int32 Amount)
+void ASnakeGridwalkerPawn::ResetSnake()
+{
+	IsAlive = true;
+
+	StepAccumulator = 0.0f;
+	TurnRotationElapsed = 0.0f;
+	IsTurning = false;
+
+	PendingGrowth = 0;
+	BodyCells.Reset();
+
+	RawMoveInput = FVector2D::ZeroVector;
+
+	GridCellPosition = SpawnCell;
+	CurrentDirection = EGridDirection::Up;
+	PendingNextDirection = EGridDirection::None;
+
+	TurnStartYaw = DirectionToYaw(CurrentDirection);
+	TurnTargetYaw = TurnStartYaw;
+
+	SetActorLocation(CellToWorld(GridCellPosition));
+
+	if (VisualMesh)
+	{
+		VisualMesh->SetRelativeRotation(FRotator(0.0f, TurnTargetYaw, 0.0f));
+	}
+
+	if (VisualSegmentMesh)
+	{
+		VisualSegmentMesh->ClearInstances();
+	}
+}
+
+void ASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 {
 	PendingGrowth += Amount;
 }
 
-void ASnakeGridwalkerPawn::OnGrowPressed(const FInputActionValue& Value)
+const TArray<FIntPoint>& ASnakeGridwalkerPawn::GetBodyCells() const
 {
-	RequestGrowth();
+	return BodyCells;
+}
+
+bool ASnakeGridwalkerPawn::TryGetBodyCell(int32 Index, FIntPoint& OutCell) const
+{
+	if (!BodyCells.IsValidIndex(Index))
+	{
+		return false;
+	}
+
+	OutCell = BodyCells[Index];
+	return true;
+}
+
+FIntPoint ASnakeGridwalkerPawn::WorldToCell(const FVector& WorldLocation) const
+{
+	const float LocalX = (WorldLocation.X - GridOrigin.X) / CellSize;
+	const float LocalY = (WorldLocation.Y - GridOrigin.Y) / CellSize;
+
+	// RoundToInt picks the nearest grid cell, FloorToInt always rounds downwards
+	return FIntPoint(
+		FMath::RoundToInt(LocalX),
+		FMath::RoundToInt(LocalY));
+}
+
+FVector ASnakeGridwalkerPawn::CellToWorld(const FIntPoint Cell) const
+{
+	return FVector(
+		GridOrigin.X + (Cell.X * CellSize),
+		GridOrigin.Y + (Cell.Y * CellSize),
+		GridWorldZ);
+}
+
+FTransform ASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const
+{
+	const FIntPoint OffsetFromHead = BodyCell - GridCellPosition;
+
+	const FVector LocalLocation(
+		OffsetFromHead.X * CellSize,
+		OffsetFromHead.Y * CellSize,
+		0.0f); // this transform is relative to snake-heads transform, so 0 = same height  
+
+	return FTransform(FRotator::ZeroRotator, LocalLocation, FVector::OneVector);
 }
 
 EGridDirection ASnakeGridwalkerPawn::ResolveDirectionFromInput(const FVector2D& Input)
@@ -179,7 +284,7 @@ EGridDirection ASnakeGridwalkerPawn::ResolveDirectionFromInput(const FVector2D& 
 	// no input early out
 	if (Input.IsNearlyZero())
 	{
-		return EGridDirection::None; // Note that this is currently overwriting older input? 
+		return EGridDirection::None;
 	}
 
 	// Vertical or Horizontal movement biggest, then direction on that axis 
@@ -208,44 +313,17 @@ void ASnakeGridwalkerPawn::OnMoveInput(const FInputActionValue& Value)
 	}
 }
 
-bool ASnakeGridwalkerPawn::TryConsumeGrowth()
+void ASnakeGridwalkerPawn::OnGrowPressed()
 {
-	if (PendingGrowth <= 0)
-	{
-		return false;
-	}
-
-
-	--PendingGrowth;
-	return true;
+	RequestGrowth();
 }
 
-FVector ASnakeGridwalkerPawn::CellToWorld(const FIntPoint Cell) const
+void ASnakeGridwalkerPawn::OnResetPressed()
 {
-	return FVector(
-		Cell.X * CellSize,
-		Cell.Y * CellSize,
-		GetActorLocation().Z);
+	ResetSnake();
 }
 
-float ASnakeGridwalkerPawn::DirectionToYaw(EGridDirection Direction)
-{
-	switch (Direction)
-	{
-	case EGridDirection::Up:
-		return 0.0f; // +X forward
-	case EGridDirection::Right:
-		return 90.0f; // +Y right
-	case EGridDirection::Down:
-		return 180.0f; // -X back
-	case EGridDirection::Left:
-		return -90.0f; // -Y left
-	default:
-		return 0.0f;
-	}
-}
-
-void ASnakeGridwalkerPawn::StartTurnVisual(EGridDirection NewDirection)
+void ASnakeGridwalkerPawn::StartHeadTurnVisual(EGridDirection NewDirection)
 {
 	TurnTargetYaw = DirectionToYaw(NewDirection);
 	TurnStartYaw = VisualMesh->GetRelativeRotation().Yaw;
@@ -254,7 +332,7 @@ void ASnakeGridwalkerPawn::StartTurnVisual(EGridDirection NewDirection)
 	IsTurning = true;
 }
 
-void ASnakeGridwalkerPawn::UpdateTurnVisual(float DeltaTime)
+void ASnakeGridwalkerPawn::UpdateHeadTurnVisual(float DeltaTime)
 {
 	if (!IsTurning)
 	{
@@ -283,6 +361,78 @@ void ASnakeGridwalkerPawn::UpdateTurnVisual(float DeltaTime)
 	}
 }
 
+void ASnakeGridwalkerPawn::AddBodyVisualSegment(const FIntPoint& BodyCell)
+{
+	if (!VisualSegmentMesh)
+	{
+		return;
+	}
+
+	VisualSegmentMesh->AddInstance(MakeBodyInstanceLocalTransform(BodyCell));
+}
+
+void ASnakeGridwalkerPawn::UpdateBodyVisualTransforms()
+{
+	if (!VisualSegmentMesh)
+	{
+		return;
+	}
+
+	const int32 VisualSegmentCount = VisualSegmentMesh->GetInstanceCount();
+	const int32 LogicCount = BodyCells.Num();
+	const int32 CountToUpdate = FMath::Min(VisualSegmentCount, LogicCount);
+
+	for (int32 Index = 0; Index < CountToUpdate; ++Index)
+	{
+		const FTransform NewTransform = MakeBodyInstanceLocalTransform(BodyCells[Index]);
+		const bool bIsLastUpdate = (Index == CountToUpdate - 1);
+
+		VisualSegmentMesh->UpdateInstanceTransform(
+			Index,
+			NewTransform,
+			false,
+			bIsLastUpdate,
+			true);
+	}
+}
+
+void ASnakeGridwalkerPawn::SyncBodyVisuals()
+{
+	if (!VisualSegmentMesh)
+	{
+		return;
+	}
+
+	int32 VisualSegmentCount = VisualSegmentMesh->GetInstanceCount();
+	const int32 LogicCount = BodyCells.Num();
+
+	while (VisualSegmentCount < LogicCount)
+	{
+		AddBodyVisualSegment(BodyCells[VisualSegmentCount]);
+		++VisualSegmentCount;
+	}
+
+	while (VisualSegmentCount > LogicCount)
+	{
+		VisualSegmentMesh->RemoveInstance(VisualSegmentCount - 1);
+		--VisualSegmentCount;
+	}
+
+	UpdateBodyVisualTransforms();
+}
+
+
+bool ASnakeGridwalkerPawn::TryConsumeGrowth()
+{
+	if (PendingGrowth <= 0)
+	{
+		return false;
+	}
+
+	--PendingGrowth;
+	return true;
+}
+
 void ASnakeGridwalkerPawn::ApplyPendingDirection()
 {
 	// Assign heading direction, and update rotation if direction changed
@@ -291,7 +441,7 @@ void ASnakeGridwalkerPawn::ApplyPendingDirection()
 	{
 		if (CurrentDirection != PendingNextDirection)
 		{
-			StartTurnVisual(PendingNextDirection);
+			StartHeadTurnVisual(PendingNextDirection);
 		}
 		CurrentDirection = PendingNextDirection;
 	}
@@ -300,10 +450,9 @@ void ASnakeGridwalkerPawn::ApplyPendingDirection()
 	PendingNextDirection = EGridDirection::None;
 }
 
-
 FIntPoint ASnakeGridwalkerPawn::PeekNextHeadCell() const
 {
-	return GridPosition + GridDelta(CurrentDirection);
+	return GridCellPosition + GridDelta(CurrentDirection);
 }
 
 void ASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
@@ -335,18 +484,26 @@ void ASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 	// later:
 	// if (!CanEnterCell(NextHeadCell)) { handle death/block; return; }
 
-	const FIntPoint PreviousHeadCell = GridPosition;
-	const FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridPosition;
+	const FIntPoint PreviousHeadCell = GridCellPosition;
+	const FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridCellPosition;
 
-	// --- Update logic state, ---
-	GridPosition = NextHeadCell;
+	// --- Commit gameplay truth / Logic state, ---
+	GridCellPosition = NextHeadCell;
 	AdvanceBodySegments(PreviousHeadCell);
 
-	if (TryConsumeGrowth())
+	const bool bGrewThisStep = TryConsumeGrowth();
+	if (bGrewThisStep)
 	{
 		BodyCells.Add(PreviousTailCell);
 	}
 
 	// --- Update Visual / World-Sync after all logic ---
 	UpdateHeadWorldLocation(NextHeadCell);
+
+	if (bGrewThisStep)
+	{
+		AddBodyVisualSegment(PreviousTailCell);
+	}
+
+	UpdateBodyVisualTransforms();
 }
