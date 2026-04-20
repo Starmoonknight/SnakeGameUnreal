@@ -173,25 +173,43 @@ void ASnakeGridwalkerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		if (MoveAction)
 		{
 			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this,
-			                          &ASnakeGridwalkerPawn::OnMoveInput);
+			                          &ASnakeGridwalkerPawn::Input_OnMove);
 			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Completed, this,
-			                          &ASnakeGridwalkerPawn::OnMoveInput);
+			                          &ASnakeGridwalkerPawn::Input_OnMove);
 			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Canceled, this,
-			                          &ASnakeGridwalkerPawn::OnMoveInput);
+			                          &ASnakeGridwalkerPawn::Input_OnMove);
 		}
 
 		if (TestGrowthAction)
 		{
 			EnhancedInput->BindAction(TestGrowthAction, ETriggerEvent::Started, this,
-			                          &ASnakeGridwalkerPawn::OnGrowPressed);
+			                          &ASnakeGridwalkerPawn::Input_OnGrowPressed);
 		}
 
 		if (TestResetAction)
 		{
 			EnhancedInput->BindAction(TestResetAction, ETriggerEvent::Started, this,
-			                          &ASnakeGridwalkerPawn::OnResetPressed);
+			                          &ASnakeGridwalkerPawn::Input_OnResetPressed);
 		}
 	}
+}
+
+bool ASnakeGridwalkerPawn::TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const
+{
+	if (!BodyCells.IsValidIndex(SegmentIndex))
+	{
+		return false;
+	}
+
+	OutCell = BodyCells[SegmentIndex];
+	return true;
+}
+
+bool ASnakeGridwalkerPawn::TryFindBodyIndexAtCell(const FIntPoint& Cell, int32& OutSegmentIndex) const
+{
+	// .IndexOfByKey returns first match, fine for snake where each body cell should be unique 
+	OutSegmentIndex = BodyCells.IndexOfByKey(Cell);
+	return OutSegmentIndex != INDEX_NONE;
 }
 
 void ASnakeGridwalkerPawn::ResetSnake()
@@ -207,14 +225,14 @@ void ASnakeGridwalkerPawn::ResetSnake()
 
 	RawMoveInput = FVector2D::ZeroVector;
 
-	GridCellPosition = SpawnCell;
+	GridCellHeadPosition = SpawnCell;
 	CurrentDirection = EGridDirection::Up;
 	PendingNextDirection = EGridDirection::None;
 
 	TurnStartYaw = DirectionToYaw(CurrentDirection);
 	TurnTargetYaw = TurnStartYaw;
 
-	SetActorLocation(CellToWorld(GridCellPosition));
+	SetActorLocation(CellToWorld(GridCellHeadPosition));
 
 	if (VisualMesh)
 	{
@@ -230,22 +248,6 @@ void ASnakeGridwalkerPawn::ResetSnake()
 void ASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 {
 	PendingGrowth += Amount;
-}
-
-const TArray<FIntPoint>& ASnakeGridwalkerPawn::GetBodyCells() const
-{
-	return BodyCells;
-}
-
-bool ASnakeGridwalkerPawn::TryGetBodyCell(int32 Index, FIntPoint& OutCell) const
-{
-	if (!BodyCells.IsValidIndex(Index))
-	{
-		return false;
-	}
-
-	OutCell = BodyCells[Index];
-	return true;
 }
 
 FIntPoint ASnakeGridwalkerPawn::WorldToCell(const FVector& WorldLocation) const
@@ -269,7 +271,7 @@ FVector ASnakeGridwalkerPawn::CellToWorld(const FIntPoint Cell) const
 
 FTransform ASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const
 {
-	const FIntPoint OffsetFromHead = BodyCell - GridCellPosition;
+	const FIntPoint OffsetFromHead = BodyCell - GridCellHeadPosition;
 
 	const FVector LocalLocation(
 		OffsetFromHead.X * CellSize,
@@ -301,7 +303,7 @@ EGridDirection ASnakeGridwalkerPawn::ResolveDirectionFromInput(const FVector2D& 
 	return EGridDirection::None;
 }
 
-void ASnakeGridwalkerPawn::OnMoveInput(const FInputActionValue& Value)
+void ASnakeGridwalkerPawn::Input_OnMove(const FInputActionValue& Value)
 {
 	RawMoveInput = Value.Get<FVector2D>();
 
@@ -313,12 +315,12 @@ void ASnakeGridwalkerPawn::OnMoveInput(const FInputActionValue& Value)
 	}
 }
 
-void ASnakeGridwalkerPawn::OnGrowPressed()
+void ASnakeGridwalkerPawn::Input_OnGrowPressed()
 {
 	RequestGrowth();
 }
 
-void ASnakeGridwalkerPawn::OnResetPressed()
+void ASnakeGridwalkerPawn::Input_OnResetPressed()
 {
 	ResetSnake();
 }
@@ -452,7 +454,7 @@ void ASnakeGridwalkerPawn::ApplyPendingDirection()
 
 FIntPoint ASnakeGridwalkerPawn::PeekNextHeadCell() const
 {
-	return GridCellPosition + GridDelta(CurrentDirection);
+	return GridCellHeadPosition + GridDelta(CurrentDirection);
 }
 
 void ASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
@@ -484,11 +486,11 @@ void ASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 	// later:
 	// if (!CanEnterCell(NextHeadCell)) { handle death/block; return; }
 
-	const FIntPoint PreviousHeadCell = GridCellPosition;
-	const FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridCellPosition;
+	const FIntPoint PreviousHeadCell = GridCellHeadPosition;
+	const FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridCellHeadPosition;
 
 	// --- Commit gameplay truth / Logic state, ---
-	GridCellPosition = NextHeadCell;
+	GridCellHeadPosition = NextHeadCell;
 	AdvanceBodySegments(PreviousHeadCell);
 
 	const bool bGrewThisStep = TryConsumeGrowth();

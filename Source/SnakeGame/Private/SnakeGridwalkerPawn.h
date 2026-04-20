@@ -52,26 +52,46 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	void ResetSnake();
+#pragma region Snake Queries
+	// --- Information getters ---
 
+	// Counts
+	int32 GetSnakeTotalSize() const { return BodyCells.Num() + 1; }
+	int32 GetBodySegmentCount() const { return BodyCells.Num(); }
+
+	// Positions
+	FIntPoint GetHeadCellPosition() const { return GridCellHeadPosition; }
+	const TArray<FIntPoint>& GetBodyCellPositions() const { return BodyCells; }
+
+	// Occupancy
+	bool IsHeadAtCell(const FIntPoint& Cell) const { return Cell == GridCellHeadPosition; }
+	bool HasBodySegmentAtCell(const FIntPoint& Cell) const { return BodyCells.Contains(Cell); }
+	bool IsSnakeAtCell(const FIntPoint& Cell) const { return (IsHeadAtCell(Cell) || HasBodySegmentAtCell(Cell)); }
+
+	// Body-Segment Access/Lookup 
+	bool TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const;
+	bool TryFindBodyIndexAtCell(const FIntPoint& Cell, int32& OutSegmentIndex) const;
+
+#pragma endregion
+
+	// --- Logic setters --- 
+	void ResetSnake();
 	void RequestGrowth(int32 Amount = 1);
 
-	const TArray<FIntPoint>& GetBodyCells() const;
-	bool TryGetBodyCell(int32 Index, FIntPoint& OutCell) const;
-
 private:
+	// Helpers
 	FIntPoint WorldToCell(const FVector& WorldLocation) const;
 	FVector CellToWorld(const FIntPoint Cell) const;
 	FTransform MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const;
-
 	static EGridDirection ResolveDirectionFromInput(const FVector2D& Input);
-	void OnMoveInput(const FInputActionValue& Value);
-	void OnGrowPressed();
-	void OnResetPressed();
+
+	// Input callbacks 
+	void Input_OnMove(const FInputActionValue& Value);
+	void Input_OnGrowPressed();
+	void Input_OnResetPressed();
 
 	void StartHeadTurnVisual(EGridDirection NewDirection);
 	void UpdateHeadTurnVisual(float DeltaTime);
-
 
 	void AddBodyVisualSegment(const FIntPoint& BodyCell);
 	void UpdateBodyVisualTransforms();
@@ -181,7 +201,7 @@ private:
 	FIntPoint SpawnCell = FIntPoint::ZeroValue;
 
 	float CellSize = 100.0f;
-	FIntPoint GridCellPosition = FIntPoint::ZeroValue;
+	FIntPoint GridCellHeadPosition = FIntPoint::ZeroValue;
 
 	bool IsAlive = true;
 
