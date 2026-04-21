@@ -66,45 +66,54 @@ ASnakeGridwalkerPawn::ASnakeGridwalkerPawn()
 	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	AutoPossessPlayer = EAutoReceiveInput::Player0;
+
 	// Collision Sphere is the root object
 	CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
 	SetRootComponent(CollisionSphere);
 	CollisionSphere->SetSphereRadius(45.f);
+	CollisionSphere->SetCollisionProfileName(TEXT("Pawn"));
+	CollisionSphere->SetGenerateOverlapEvents(true);
 
 	// attach the VisualMesh to the sphere
-	VisualMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualMesh"));
-	VisualMesh->SetupAttachment(CollisionSphere);
+	SnakeHeadMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SnakeHeadMesh"));
+	SnakeHeadMesh->SetupAttachment(RootComponent);
+	SnakeHeadMesh->SetRelativeLocation(FVector::ZeroVector);
+	SnakeHeadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SnakeHeadMesh->SetSimulatePhysics(false);
 
 	VisualSegmentMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("VisualSegmentMesh"));
-	VisualSegmentMesh->SetupAttachment(CollisionSphere);
+	VisualSegmentMesh->SetupAttachment(RootComponent);
 
 	// attach the SpringArm to the sphere and set position settings
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-	SpringArm->SetupAttachment(CollisionSphere);
+	SpringArm->SetupAttachment(RootComponent);
 	SpringArm->TargetArmLength = 700.f;
+	SpringArm->bUsePawnControlRotation = false;
+	SpringArm->SetUsingAbsoluteRotation(true);
 	SpringArm->SetRelativeRotation(FRotator(-55.0f, 0.0f, 0.0f));
 	SpringArm->bDoCollisionTest = false;
-	SpringArm->bInheritPitch = false;
-	SpringArm->bInheritRoll = false;
-	SpringArm->bInheritYaw = false;
+	SpringArm->bInheritPitch = false; // are these three still needed? This, 
+	SpringArm->bInheritRoll = false; // this,
+	SpringArm->bInheritYaw = false; // and this.
 
 	// attach the camera to the SpringArm
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-	Camera->SetupAttachment(SpringArm);
+	Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName); // new, use of SocketName word
 
-	AutoPossessPlayer = EAutoReceiveInput::Player0;
+	bUseControllerRotationYaw = false; // new
 }
 
 void ASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	if (VisualMesh && HeadMeshAsset)
+	if (SnakeHeadMesh && HeadMeshAsset)
 	{
-		VisualMesh->SetStaticMesh(HeadMeshAsset);
+		SnakeHeadMesh->SetStaticMesh(HeadMeshAsset);
 		if (HeadMaterialAsset)
 		{
-			VisualMesh->SetMaterial(0, HeadMaterialAsset);
+			SnakeHeadMesh->SetMaterial(0, HeadMaterialAsset);
 		}
 	}
 
@@ -137,7 +146,6 @@ void ASnakeGridwalkerPawn::BeginPlay()
 				UEnhancedInputLocalPlayerSubsystem>())
 			{
 				if (DefaultMappingContext)
-
 				{
 					InputSubsystem->AddMappingContext(DefaultMappingContext, 0);
 				}
@@ -150,6 +158,11 @@ void ASnakeGridwalkerPawn::BeginPlay()
 void ASnakeGridwalkerPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (!bIsAlive)
+	{
+		return;
+	}
 
 	UpdateHeadTurnVisual(DeltaTime);
 
@@ -214,7 +227,7 @@ bool ASnakeGridwalkerPawn::TryFindBodyIndexAtCell(const FIntPoint& Cell, int32& 
 
 void ASnakeGridwalkerPawn::ResetSnake()
 {
-	IsAlive = true;
+	bIsAlive = true;
 
 	StepAccumulator = 0.0f;
 	TurnRotationElapsed = 0.0f;
@@ -234,9 +247,9 @@ void ASnakeGridwalkerPawn::ResetSnake()
 
 	SetActorLocation(CellToWorld(GridCellHeadPosition));
 
-	if (VisualMesh)
+	if (SnakeHeadMesh)
 	{
-		VisualMesh->SetRelativeRotation(FRotator(0.0f, TurnTargetYaw, 0.0f));
+		SnakeHeadMesh->SetRelativeRotation(FRotator(0.0f, TurnTargetYaw, 0.0f));
 	}
 
 	if (VisualSegmentMesh)
@@ -247,6 +260,11 @@ void ASnakeGridwalkerPawn::ResetSnake()
 
 void ASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 {
+	if (Amount <= 0)
+	{
+		return;
+	}
+
 	PendingGrowth += Amount;
 }
 
@@ -328,7 +346,7 @@ void ASnakeGridwalkerPawn::Input_OnResetPressed()
 void ASnakeGridwalkerPawn::StartHeadTurnVisual(EGridDirection NewDirection)
 {
 	TurnTargetYaw = DirectionToYaw(NewDirection);
-	TurnStartYaw = VisualMesh->GetRelativeRotation().Yaw;
+	TurnStartYaw = SnakeHeadMesh->GetRelativeRotation().Yaw;
 
 	TurnRotationElapsed = 0.0f;
 	IsTurning = true;
@@ -352,12 +370,12 @@ void ASnakeGridwalkerPawn::UpdateHeadTurnVisual(float DeltaTime)
 	const float DeltaYaw = FMath::FindDeltaAngleDegrees(TurnStartYaw, TurnTargetYaw);
 	const float NewYaw = TurnStartYaw + (DeltaYaw * Alpha);
 
-	VisualMesh->SetRelativeRotation(FRotator(0.0f, NewYaw, 0.0f));
+	SnakeHeadMesh->SetRelativeRotation(FRotator(0.0f, NewYaw, 0.0f));
 
 	// stop rotation at target value, even if it would have overshoot. 
 	if (Alpha >= 1.0f) // TurnRotationElapsed >= TurnDuration
 	{
-		VisualMesh->SetRelativeRotation(FRotator(0.0f, TurnTargetYaw, 0.0f));
+		SnakeHeadMesh->SetRelativeRotation(FRotator(0.0f, TurnTargetYaw, 0.0f));
 		IsTurning = false;
 		TurnRotationElapsed = 0.0f;
 	}

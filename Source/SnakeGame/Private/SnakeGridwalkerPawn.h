@@ -52,8 +52,8 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-#pragma region Snake Queries
 	// --- Information getters ---
+#pragma region Snake Queries
 
 	// Counts
 	int32 GetSnakeTotalSize() const { return BodyCells.Num() + 1; }
@@ -125,11 +125,11 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USphereComponent> CollisionSphere;
 
-	UPROPERTY(VisibleAnywhere, Category = "SnakeBody|Components") // for showing property in property windows only
-	TObjectPtr<UStaticMeshComponent> VisualMesh;
+	UPROPERTY(VisibleAnywhere, Category = "SnakeBody|Components") // for showing property in property windows only,
+	TObjectPtr<UStaticMeshComponent> SnakeHeadMesh; // only kept visible for debug purpose 
 
-	UPROPERTY(VisibleAnywhere, Category = "SnakeBody|Components")
-	TObjectPtr<UInstancedStaticMeshComponent> VisualSegmentMesh;
+	UPROPERTY(VisibleAnywhere, Category = "SnakeBody|Components") // for showing property in property windows only,
+	TObjectPtr<UInstancedStaticMeshComponent> VisualSegmentMesh; // only kept visible for debug purpose 
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SnakeBody|Components",
 		meta = (AllowPrivateAccess = "true"))
@@ -200,10 +200,13 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	FIntPoint SpawnCell = FIntPoint::ZeroValue;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
+		meta = (AllowPrivateAccess = "true", ClampMin = "1.0", UIMin = "1.0"))
 	float CellSize = 100.0f;
+
 	FIntPoint GridCellHeadPosition = FIntPoint::ZeroValue;
 
-	bool IsAlive = true;
+	bool bIsAlive = true;
 
 	float StepAccumulator = 0.0f;
 	float TurnRotationElapsed = 0.0f;
