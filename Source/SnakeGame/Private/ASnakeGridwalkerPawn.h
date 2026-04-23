@@ -6,7 +6,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "InputActionValue.h"
-#include "SnakeGridwalkerPawn.generated.h"
+#include "ASnakeGridwalkerPawn.generated.h"
 
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -31,13 +31,13 @@ enum class EGridDirection : uint8
 
 
 UCLASS()
-class ASnakeGridwalkerPawn : public APawn
+class AASnakeGridwalkerPawn : public APawn
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this pawn's properties
-	ASnakeGridwalkerPawn();
+	AASnakeGridwalkerPawn();
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -56,26 +56,43 @@ public:
 #pragma region Snake Queries
 
 	// Counts
+	UFUNCTION(BlueprintPure, Category="Snake")
 	int32 GetSnakeTotalSize() const { return BodyCells.Num() + 1; }
+
+	UFUNCTION(BlueprintPure, Category="Snake")
 	int32 GetBodySegmentCount() const { return BodyCells.Num(); }
 
 	// Positions
+	UFUNCTION(BlueprintPure, Category="Snake")
 	FIntPoint GetHeadCellPosition() const { return GridCellHeadPosition; }
+
+	UFUNCTION(BlueprintPure, Category="Snake")
 	const TArray<FIntPoint>& GetBodyCellPositions() const { return BodyCells; }
 
 	// Occupancy
+	UFUNCTION(BlueprintPure, Category="Snake")
 	bool IsHeadAtCell(const FIntPoint& Cell) const { return Cell == GridCellHeadPosition; }
+
+	UFUNCTION(BlueprintPure, Category="Snake")
 	bool HasBodySegmentAtCell(const FIntPoint& Cell) const { return BodyCells.Contains(Cell); }
+
+	UFUNCTION(BlueprintPure, Category="Snake")
 	bool IsSnakeAtCell(const FIntPoint& Cell) const { return (IsHeadAtCell(Cell) || HasBodySegmentAtCell(Cell)); }
 
 	// Body-Segment Access/Lookup 
+	UFUNCTION(BlueprintPure, Category="Snake")
 	bool TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const;
+
+	UFUNCTION(BlueprintPure, Category="Snake")
 	bool TryFindBodyIndexAtCell(const FIntPoint& Cell, int32& OutSegmentIndex) const;
 
 #pragma endregion
 
 	// --- Logic setters --- 
+	UFUNCTION(BlueprintCallable, Category="Snake")
 	void ResetSnake();
+
+	UFUNCTION(BlueprintCallable, Category="Snake")
 	void RequestGrowth(int32 Amount = 1);
 
 private:
@@ -197,12 +214,12 @@ private:
 	float GridWorldZ = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
-		meta = (AllowPrivateAccess = "true"))
-	FIntPoint SpawnCell = FIntPoint::ZeroValue;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
 		meta = (AllowPrivateAccess = "true", ClampMin = "1.0", UIMin = "1.0"))
 	float CellSize = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
+		meta = (AllowPrivateAccess = "true"))
+	FIntPoint SpawnCell = FIntPoint::ZeroValue;
 
 	FIntPoint GridCellHeadPosition = FIntPoint::ZeroValue;
 

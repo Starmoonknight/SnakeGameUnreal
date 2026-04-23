@@ -4,26 +4,26 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "FoodActor.generated.h"
+#include "AFoodActor.generated.h"
 
+//class ASnakeGridwalkerPawn;
 class USphereComponent;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
-class ASnakeGridwalkerPawn;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FFoodConsumedSignature,
-	AFoodActor*, Food,
+	AAFoodActor*, Food,
 	AActor*, ConsumerActor);
 
 UCLASS()
-class AFoodActor : public AActor
+class AAFoodActor : public AActor
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
-	AFoodActor();
+	AAFoodActor();
 
 protected:
 	// Called when the game starts or when spawned
@@ -46,13 +46,14 @@ public:
 	int32 GetGrowthValue() const { return GrowthValue; }
 
 	// --- Logic setters --- 
-	/*
 	UFUNCTION(BlueprintCallable, Category = "Pickups|Food")
 	void SetFoodGridPosition(const FIntPoint& NewGridPosition, const FVector& NewWorldLocation);
 
 	UFUNCTION(BlueprintCallable, Category = "Pickups|Food")
 	void SetFoodValues(const int32 NewScoreValue, const int32 NewGrowthValue);
-	*/
+
+	UFUNCTION(BlueprintCallable, Category = "Pickups|Food")
+	void SetActiveStatus(bool bShouldBeActive, bool bShouldBroadcastChange = false);
 
 private:
 	UFUNCTION()
@@ -65,6 +66,8 @@ private:
 		const FHitResult& SweepResult);
 
 	void ConsumeBy(AActor* ConsumerActor);
+	void InactivateFood();
+	void ActivateFood();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = true))
 	TObjectPtr<UStaticMeshComponent> FoodMesh;
