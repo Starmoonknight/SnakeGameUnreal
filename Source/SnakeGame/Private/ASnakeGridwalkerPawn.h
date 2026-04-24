@@ -142,10 +142,10 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USphereComponent> CollisionSphere;
 
-	UPROPERTY(VisibleAnywhere, Category = "SnakeBody|Components") // for showing property in property windows only,
+	UPROPERTY(VisibleInstanceOnly, Category = "SnakeBody|Components") // for showing property in property windows only,
 	TObjectPtr<UStaticMeshComponent> SnakeHeadMesh; // only kept visible for debug purpose 
 
-	UPROPERTY(VisibleAnywhere, Category = "SnakeBody|Components") // for showing property in property windows only,
+	UPROPERTY(VisibleInstanceOnly, Category = "SnakeBody|Components") // for showing property in property windows only,
 	TObjectPtr<UInstancedStaticMeshComponent> VisualSegmentMesh; // only kept visible for debug purpose 
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SnakeBody|Components",

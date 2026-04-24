@@ -12,6 +12,44 @@
 
 namespace
 {
+	struct FBoardBuildData
+	{
+		FVector2D BoardWorldSize = FVector2D::ZeroVector;
+		FVector BoardWorldCenter = FVector::ZeroVector;
+
+		float BoardWidth = 0.f;
+		float BoardHeight = 0.f;
+		float HalfCell = 0.f;
+		float WallHeight = 0.f;
+		float WallThickness = 0.f;
+	};
+
+	FBoardBuildData BuildBoardData(
+		const FIntPoint& GridDimensions,
+		const FVector2D& GridOrigin,
+		const float CellSize,
+		const float GridWorldZ)
+	{
+		FBoardBuildData Data;
+
+		Data.BoardWorldSize = FVector2D(
+			GridDimensions.X * CellSize,
+			GridDimensions.Y * CellSize);
+
+		Data.BoardWorldCenter = FVector(
+			GridOrigin.X + ((GridDimensions.X - 1) * CellSize * 0.5f),
+			GridOrigin.Y + ((GridDimensions.Y - 1) * CellSize * 0.5f),
+			GridWorldZ);
+
+		Data.BoardWidth = GridDimensions.X * CellSize;
+		Data.BoardHeight = GridDimensions.Y * CellSize;
+		Data.HalfCell = CellSize / 2.0f;
+		Data.WallHeight = CellSize;
+		Data.WallThickness = CellSize;
+
+		return Data;
+	}
+
 	int32 FoFlatIndex(const FIntPoint& Cell, const FIntPoint& GridDimensions)
 	{
 		return Cell.Y * GridDimensions.X + Cell.X;
@@ -58,7 +96,7 @@ void AAGridManagerActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	RebuildGridVisuals();
+	SetupGridVisuals_Stretchy();
 }
 
 // Called when the game starts or when spawned
@@ -68,7 +106,7 @@ void AAGridManagerActor::BeginPlay()
 
 	RandomStream.Initialize(RandomSeed);
 	InitializeCells();
-	RespawnFruit_Temp();
+	//RespawnFruit_Temp();
 }
 
 // Called every frame
@@ -96,34 +134,6 @@ FVector AAGridManagerActor::CellToWorld(const FIntPoint Cell) const
 		GridWorldZ);
 }
 
-
-FVector2D AAGridManagerActor::GetBoardWorldSize() const
-{
-	const FVector2D BoardWorldSize(
-		GridDimensions.X * CellSize,
-		GridDimensions.Y * CellSize);
-
-	return BoardWorldSize;
-}
-
-FVector AAGridManagerActor::GetBoardWorldCenter() const
-{
-	const FVector BoardCenter(
-		GridOrigin.X + ((GridDimensions.X - 1) * CellSize * 0.5f),
-		GridOrigin.Y + ((GridDimensions.Y - 1) * CellSize * 0.5f),
-		GridWorldZ);
-
-	return BoardCenter;
-}
-
-void AAGridManagerActor::CalculateBoardSize()
-{
-	const float BoardWidth = GridDimensions.X * CellSize;
-	const float BoardHeight = GridDimensions.Y * CellSize;
-	const float HalfCell = CellSize / 2.0f;
-	const float WallHeight = CellSize;
-	const float WallThickness = CellSize;
-}
 
 UStaticMesh* AAGridManagerActor::GetWallMeshToUse() const
 {
@@ -159,14 +169,68 @@ void AAGridManagerActor::InitializeCells()
 
 void AAGridManagerActor::BuildTiledFloor()
 {
+	// way to make checkered material look here. 
 }
 
-void AAGridManagerActor::RebuildGridVisuals()
+void AAGridManagerActor::SetupGridVisuals_Stretchy()
 {
-	FVector2D BoardWorldSize = GetBoardWorldSize();
-	FVector BoardWorldCenter = GetBoardWorldCenter();
+	// gather derived values 
+	const FBoardBuildData GridData = BuildBoardData(
+		GridDimensions, GridOrigin, CellSize, GridWorldZ);
 
-	FVector
-	NorthWallPlacement.Y = BoardWorldCenter.Y + BoardWorldSize.Y * 0.5f + WallThickness * 0.5f;
-	NorthWallPlacement.Z = GridWorldZ + WallHeight * 0.5f;
+	UStaticMesh* WallMeshToUse = GetWallMeshToUse();
+	UStaticMesh* FloorMeshToUse = GetFloorMeshToUse();
+
+	// select what meshes to use
+	FloorVisuals->SetStaticMesh(FloorMeshToUse);
+	NorthWallVisual->SetStaticMesh(WallMeshToUse);
+	SouthWallVisual->SetStaticMesh(WallMeshToUse);
+	EastWallVisual->SetStaticMesh(WallMeshToUse);
+	WestWallVisual->SetStaticMesh(WallMeshToUse);
+
+	// scaling floor size with assumption fallback meshes are built so scale 1 = 1 cell (100 units)
+	FloorVisuals->SetWorldLocation(GridData.BoardWorldCenter);
+	FloorVisuals->SetWorldScale3D(FVector(
+		GridDimensions.X,
+		GridDimensions.Y,
+		1.0f));
+
+	// same size assumption for wall meshes, just scale to fit 
+	// place wall objects  
+
+	// North Wall: Y = CenterY + HalfBoardHeight + HalfWallThickness
+	const FVector NorthLocation(
+		GridData.BoardWorldCenter.X,
+		GridData.BoardWorldCenter.Y + (GridData.BoardHeight * 0.5f) + (GridData.WallThickness * 0.5f),
+		GridWorldZ + (GridData.WallHeight * 0.5f));
+
+	NorthWallVisual->SetWorldScale3D(FVector(GridDimensions.X, 1.0f, 1.0f));
+	NorthWallVisual->SetWorldLocation(NorthLocation);
+
+	// South wall: Y = CenterY - HalfBoardHeight - HalfWallThickness
+	const FVector SouthLocation(
+		GridData.BoardWorldCenter.X,
+		GridData.BoardWorldCenter.Y - (GridData.BoardHeight * 0.5f) - (GridData.WallThickness * 0.5f),
+		GridWorldZ + (GridData.WallHeight * 0.5f));
+
+	SouthWallVisual->SetWorldScale3D(FVector(GridDimensions.X, 1.0f, 1.0f));
+	SouthWallVisual->SetWorldLocation(SouthLocation);
+
+	// East wall: X = CenterX + HalfBoardWidth + HalfWallThickness
+	const FVector EastLocation(
+		GridData.BoardWorldCenter.X + (GridData.BoardWidth * 0.5f) + (GridData.WallThickness * 0.5f),
+		GridData.BoardWorldCenter.Y,
+		GridWorldZ + (GridData.WallHeight * 0.5f));
+
+	EastWallVisual->SetWorldScale3D(FVector(1.0f, GridDimensions.Y, 1.0f));
+	EastWallVisual->SetWorldLocation(EastLocation);
+
+	// West wall: X = CenterX - HalfBoardWidth - HalfWallThickness
+	const FVector WestLocation(
+		GridData.BoardWorldCenter.X - (GridData.BoardWidth * 0.5f) - (GridData.WallThickness * 0.5f),
+		GridData.BoardWorldCenter.Y,
+		GridWorldZ + (GridData.WallHeight * 0.5f));
+
+	WestWallVisual->SetWorldScale3D(FVector(1.0f, GridDimensions.Y, 1.0f));
+	WestWallVisual->SetWorldLocation(WestLocation);
 }
