@@ -41,7 +41,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Pickups|Food")
 	FIntPoint GetFoodGridPosition() const { return FoodGridPosition; }
 
-	bool ActiveStatus() const { return bIsActive; }
+	bool HasActiveStatus() const { return bIsActive; }
 	int32 GetScoreValue() const { return ScoreValue; }
 	int32 GetGrowthValue() const { return GrowthValue; }
 

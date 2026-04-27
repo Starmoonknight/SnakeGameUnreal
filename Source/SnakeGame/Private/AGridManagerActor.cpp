@@ -24,11 +24,32 @@ namespace
 		float WallThickness = 0.f;
 	};
 
+	constexpr uint32 FruitSeedTag = 0xF17E1234u;
+
+	uint32 MixSeed(uint32 Seed, uint32 Tag)
+	{
+		Seed ^= Tag + 0x9E3779B9u + (Seed << 6) + (Seed >> 2);
+		Seed ^= Seed >> 16;
+		Seed *= 0x7FEB352Du;
+		Seed ^= Seed >> 15;
+		Seed *= 0x846CA68Bu;
+		Seed ^= Seed >> 16;
+		return Seed;
+	}
+
+	int32 MakeSubsystemSeed(int32 RootSeed, uint32 SubsystemTag)
+	{
+		const uint32 Mixed = MixSeed(static_cast<uint32>(RootSeed), SubsystemTag);
+
+		return static_cast<int32>(Mixed & 0x7FFFFFFFu);
+	}
+
+
 	FBoardBuildData BuildBoardData(
 		const FIntPoint& GridDimensions,
 		const FVector2D& GridOrigin,
-		const float CellSize,
-		const float GridWorldZ)
+		float CellSize,
+		float GridWorldZ)
 	{
 		FBoardBuildData Data;
 
@@ -48,11 +69,6 @@ namespace
 		Data.WallThickness = CellSize;
 
 		return Data;
-	}
-
-	int32 FoFlatIndex(const FIntPoint& Cell, const FIntPoint& GridDimensions)
-	{
-		return Cell.Y * GridDimensions.X + Cell.X;
 	}
 }
 
@@ -104,15 +120,31 @@ void AAGridManagerActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	RandomStream.Initialize(RandomSeed);
+
+	FoodRandomStream.Initialize(MakeSubsystemSeed(RootSeed, FruitSeedTag));
 	InitializeCells();
-	//RespawnFruit_Temp();
+
+	RespawnFruit_Temp();
 }
 
 // Called every frame
 void AAGridManagerActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+bool AAGridManagerActor::IsInBounds(const FIntPoint& Cell) const
+{
+	return (Cell.X >= 0 && Cell.X < GridDimensions.X)
+		&& (Cell.Y >= 0 && Cell.Y < GridDimensions.Y);
+}
+
+FVector AAGridManagerActor::CellToWorld(const FIntPoint& Cell) const
+{
+	return FVector(
+		GridOrigin.X + (Cell.X * CellSize),
+		GridOrigin.Y + (Cell.Y * CellSize),
+		GridWorldZ);
 }
 
 FIntPoint AAGridManagerActor::WorldToCell(const FVector& WorldLocation) const
@@ -126,14 +158,78 @@ FIntPoint AAGridManagerActor::WorldToCell(const FVector& WorldLocation) const
 		FMath::RoundToInt(LocalY));
 }
 
-FVector AAGridManagerActor::CellToWorld(const FIntPoint Cell) const
+bool AAGridManagerActor::IsCellBlockedByBoard(const FIntPoint& Cell) const
 {
-	return FVector(
-		GridOrigin.X + (Cell.X * CellSize),
-		GridOrigin.Y + (Cell.Y * CellSize),
-		GridWorldZ);
+	return Cells[FlatIndex(Cell)] == EGridCellType::Blocked;
 }
 
+bool AAGridManagerActor::IsFoodAtCell_Temp(const FIntPoint& Cell) const
+{
+	return IsValid(CurrentFood)
+		&& CurrentFood->HasActiveStatus()
+		&& CurrentFood->GetFoodGridPosition() == Cell;
+}
+
+
+/*
+FlatIndex()
+IndexToCoord()
+
+These formulas assume:
+
+GridDimensions.X > 0
+Cell.X >= 0
+Cell.Y >= 0
+Cell.X < GridDimensions.X
+Cell.Y < GridDimensions.Y
+Index >= 0
+Index < GridDimensions.X * GridDimensions.Y
+*/
+
+
+void AAGridManagerActor::RespawnFruit_Temp()
+{
+	FIntPoint NewFoodCell;
+	if (!TryFindRandomFreeCell(NewFoodCell))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No valid free cell found for fruit."));
+		return;
+	}
+
+	SpawnFruitAtCell_Temp(NewFoodCell);
+}
+
+void AAGridManagerActor::HandleFruitConsumed_Temp(AAFoodActor* Food, AActor* ConsumerActor)
+{
+	if (Food != CurrentFood)
+	{
+		return;
+	}
+
+	CurrentFood = nullptr;
+	RespawnFruit_Temp();
+}
+
+int32 AAGridManagerActor::FlatIndex(const FIntPoint& Cell) const
+{
+	check(GridDimensions.X > 0);
+	check(IsInBounds(Cell));
+
+	return Cell.Y * GridDimensions.X + Cell.X;
+}
+
+FIntPoint AAGridManagerActor::IndexToCellCoord(const int32 Index) const
+{
+	check(GridDimensions.X > 0);
+	check(GridDimensions.Y > 0);
+	check(Index >= 0);
+	check(Index < GridDimensions.X * GridDimensions.Y);
+
+	const int32 X = Index % GridDimensions.X;
+	const int32 Y = Index / GridDimensions.X;
+
+	return FIntPoint(X, Y);
+}
 
 UStaticMesh* AAGridManagerActor::GetWallMeshToUse() const
 {
@@ -155,6 +251,93 @@ UStaticMesh* AAGridManagerActor::GetFloorMeshToUse() const
 	return FallbackPlaneMesh;
 }
 
+bool AAGridManagerActor::TryFindRandomFreeCell(FIntPoint& OutCell)
+{
+	TArray<FIntPoint> CandidateCells;
+	CandidateCells.Reserve(GetCellCount());
+
+	for (int32 Y = 0; Y < GridDimensions.Y; Y++)
+	{
+		for (int32 X = 0; X < GridDimensions.X; X++)
+		{
+			const FIntPoint Cell(X, Y);
+
+			if (CanPlaceFruitAtCell_Temp(Cell))
+			{
+				CandidateCells.Add(Cell);
+			}
+		}
+	}
+
+	if (CandidateCells.IsEmpty())
+	{
+		return false;
+	}
+
+	const int32 RandomIndex = FoodRandomStream.RandRange(0, CandidateCells.Num() - 1);
+	OutCell = CandidateCells[RandomIndex];
+
+	return true;
+}
+
+bool AAGridManagerActor::CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const
+{
+	if (!IsInBounds(Cell))
+	{
+		return false;
+	}
+
+	const bool bBlocked =
+		IsCellBlockedByBoard(Cell)
+		|| IsFoodAtCell_Temp(Cell)
+		|| (Snake && Snake->IsSnakeAtCell(Cell));
+
+	return !bBlocked;
+}
+
+void AAGridManagerActor::SpawnFruitAtCell_Temp(const FIntPoint& Cell)
+{
+	if (!FoodClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("GridManager has no FoodClass assigned."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (IsValid(CurrentFood))
+	{
+		CurrentFood->Destroy();
+		CurrentFood = nullptr;
+	}
+
+	const FVector SpawnLocation = CellToWorld(Cell);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+
+	CurrentFood = World->SpawnActor<AAFoodActor>(
+		FoodClass,
+		SpawnLocation,
+		FRotator::ZeroRotator,
+		SpawnParams);
+
+	if (!CurrentFood)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to spawn food."));
+		return;
+	}
+
+	CurrentFood->SetFoodGridPosition(Cell, CellToWorld(Cell));
+	CurrentFood->SetFoodValues(1, 1);
+	CurrentFood->SetActiveStatus(true);
+
+	CurrentFood->OnFruitConsumed.AddDynamic(this, &AAGridManagerActor::HandleFruitConsumed_Temp);
+}
 
 void AAGridManagerActor::InitializeCells()
 {

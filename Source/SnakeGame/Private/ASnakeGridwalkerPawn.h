@@ -8,6 +8,8 @@
 #include "InputActionValue.h"
 #include "ASnakeGridwalkerPawn.generated.h"
 
+class AAGridManagerActor;
+
 class UStaticMesh;
 class UStaticMeshComponent;
 class UInstancedStaticMeshComponent;
@@ -97,8 +99,6 @@ public:
 
 private:
 	// Helpers
-	FIntPoint WorldToCell(const FVector& WorldLocation) const;
-	FVector CellToWorld(const FIntPoint Cell) const;
 	FTransform MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const;
 	static EGridDirection ResolveDirectionFromInput(const FVector2D& Input);
 
@@ -121,6 +121,10 @@ private:
 	void UpdateHeadWorldLocation(const FIntPoint& NextHeadCell);
 	void AdvanceBodySegments(FIntPoint VacatedCell);
 	void AdvanceSnakeOneStep();
+
+
+	UPROPERTY(EditAnywhere, Category = "SnakeBody|References", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<AAGridManagerActor> GridManager;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SnakeBody|Assets",
 		meta = (AllowPrivateAccess = "true")) // place for actually assigning the mesh used
@@ -204,18 +208,6 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Movement",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", UIMin = "0.01"))
 	float TurnDuration = 0.15f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
-		meta = (AllowPrivateAccess = "true"))
-	FVector2D GridOrigin = FVector2D::ZeroVector;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
-		meta = (AllowPrivateAccess = "true"))
-	float GridWorldZ = 0.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
-		meta = (AllowPrivateAccess = "true", ClampMin = "1.0", UIMin = "1.0"))
-	float CellSize = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
 		meta = (AllowPrivateAccess = "true"))

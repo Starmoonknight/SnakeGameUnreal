@@ -7,6 +7,7 @@
 #include "AGridManagerActor.generated.h"
 
 class AAFoodActor;
+class AASnakeGridwalkerPawn;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UInstancedStaticMeshComponent;
@@ -40,22 +41,29 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	/*
+
 	// Helpers
+	UFUNCTION(BlueprintPure, Category = "Grid")
+	int32 GetWidth() const { return GridDimensions.X; }
+
+	UFUNCTION(BlueprintPure, Category = "Grid")
+	int32 GetHeight() const { return GridDimensions.Y; }
+
+	UFUNCTION(BlueprintPure, Category = "Grid")
+	int32 GetCellCount() const { return GridDimensions.X * GridDimensions.Y; }
+
+	UFUNCTION(BlueprintPure, Category = "Grid")
+	int32 GetCellSize() const { return CellSize; }
+
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsInBounds(const FIntPoint& Cell) const;
 
 	UFUNCTION(BlueprintPure, Category = "Grid")
-	int32 ToIndex(const FIntPoint& Cell) const;
-	*/
+	FVector CellToWorld(const FIntPoint& Cell) const;
 
 	UFUNCTION(BlueprintPure, Category = "Grid") // BlueprintCallable or BlueprintPure, and why? 
 	FIntPoint WorldToCell(const FVector& WorldLocation) const;
 
-	UFUNCTION(BlueprintPure, Category = "Grid")
-	FVector CellToWorld(const FIntPoint Cell) const;
-
-	/*
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsCellBlockedByBoard(const FIntPoint& Cell) const;
 
@@ -63,30 +71,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsFoodAtCell_Temp(const FIntPoint& Cell) const;
 
-
-	UFUNCTION(BlueprintCallable, Category = "Grid")
-	bool TryFindRandomFreeCell(FIntPoint& OutCell, const TArray<FIntPoint>& ForbiddenCells,
-	                           int32 MaxAttempts = 200) const;
-
-	UFUNCTION(BlueprintPure, Category = "Grid|Queries")
-	bool CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const;
-
-	UFUNCTION(BlueprintCallable, Category = "Grid|Food")
-	void SpawnFruitAtCell_Temp(const FIntPoint& Cell);
-
 	UFUNCTION(BlueprintCallable, Category = "Grid|Food")
 	void RespawnFruit_Temp();
-	*/
 
 private:
+	UFUNCTION()
+	void HandleFruitConsumed_Temp(AAFoodActor* Food, AActor* ConsumerActor);
+
+	int32 FlatIndex(const FIntPoint& Cell) const;
+	FIntPoint IndexToCellCoord(const int32 Index) const;
+
 	UStaticMesh* GetWallMeshToUse() const;
 	UStaticMesh* GetFloorMeshToUse() const;
+
+	bool TryFindRandomFreeCell(FIntPoint& OutCell);
+	bool CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const;
+	void SpawnFruitAtCell_Temp(const FIntPoint& Cell);
 
 	// board setup 
 	void InitializeCells();
 	void BuildTiledFloor();
 	void SetupGridVisuals_Stretchy();
 
+	UPROPERTY(EditInstanceOnly, Category = "Grid|References", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<AASnakeGridwalkerPawn> Snake;
 
 	UPROPERTY(EditAnywhere, Category = "Grid|Food", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AAFoodActor> FoodClass;
@@ -104,16 +112,16 @@ private:
 	FVector2D GridOrigin = FVector2D::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
-		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
-	int CellSize = 100;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
 		meta = (AllowPrivateAccess = "true"))
 	float GridWorldZ = 0.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
+	int32 CellSize = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
 		meta = (AllowPrivateAccess = "true"))
-	int32 RandomSeed = 12345;
+	int32 RootSeed = 12345;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
 		meta = (AllowPrivateAccess = "true"))
@@ -171,8 +179,8 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> WestWallVisual;
 
-
 	TArray<EGridCellType> Cells;
 
-	FRandomStream RandomStream;
+
+	FRandomStream FoodRandomStream;
 };

@@ -3,6 +3,7 @@
 //SnakeGridwalkerPawn.cpp
 #include "ASnakeGridwalkerPawn.h"
 
+#include "AGridManagerActor.h"
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
 #include "Components/SphereComponent.h"
@@ -128,8 +129,15 @@ void AASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
 		}
 	}
 
-	SpawnCell = WorldToCell(GetActorLocation());
-	GridWorldZ = GetActorLocation().Z;
+	if (!GridManager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Snake has no GridManager assigned. This will break everything."));
+	}
+	else
+	{
+		SpawnCell = GridManager->WorldToCell(GetActorLocation());
+		GridCellHeadPosition = SpawnCell;
+	}
 }
 
 // Called when the game starts or when spawned
@@ -228,6 +236,13 @@ bool AASnakeGridwalkerPawn::TryFindBodyIndexAtCell(const FIntPoint& Cell, int32&
 
 void AASnakeGridwalkerPawn::ResetSnake()
 {
+	if (!GridManager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot reset snake: no GridManager assigned."));
+		bIsAlive = false;
+		return;
+	}
+
 	bIsAlive = true;
 
 	StepAccumulator = 0.0f;
@@ -246,7 +261,7 @@ void AASnakeGridwalkerPawn::ResetSnake()
 	TurnStartYaw = DirectionToYaw(CurrentDirection);
 	TurnTargetYaw = TurnStartYaw;
 
-	SetActorLocation(CellToWorld(GridCellHeadPosition));
+	SetActorLocation(GridManager->CellToWorld(GridCellHeadPosition));
 
 	if (SnakeHeadMesh)
 	{
@@ -269,33 +284,20 @@ void AASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 	PendingGrowth += Amount;
 }
 
-FIntPoint AASnakeGridwalkerPawn::WorldToCell(const FVector& WorldLocation) const
-{
-	const float LocalX = (WorldLocation.X - GridOrigin.X) / CellSize;
-	const float LocalY = (WorldLocation.Y - GridOrigin.Y) / CellSize;
-
-	// RoundToInt picks the nearest grid cell, FloorToInt always rounds downwards
-	return FIntPoint(
-		FMath::RoundToInt(LocalX),
-		FMath::RoundToInt(LocalY));
-}
-
-FVector AASnakeGridwalkerPawn::CellToWorld(const FIntPoint Cell) const
-{
-	return FVector(
-		GridOrigin.X + (Cell.X * CellSize),
-		GridOrigin.Y + (Cell.Y * CellSize),
-		GridWorldZ);
-}
 
 FTransform AASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const
 {
-	const FIntPoint OffsetFromHead = BodyCell - GridCellHeadPosition;
+	if (!GridManager)
+	{
+		// should appear at the sneak head root as fallback
+		UE_LOG(LogTemp, Warning, TEXT("Snake has no GridManager assigned."));
+		return FTransform::Identity;
+	}
 
-	const FVector LocalLocation(
-		OffsetFromHead.X * CellSize,
-		OffsetFromHead.Y * CellSize,
-		0.0f); // this transform is relative to snake-heads transform, so 0 = same height  
+	const FVector BodyWorldLocation = GridManager->CellToWorld(BodyCell);
+
+	// take this world-space position and convert it into the snake actor's local space
+	const FVector LocalLocation = GetActorTransform().InverseTransformPosition(BodyWorldLocation);
 
 	return FTransform(FRotator::ZeroRotator, LocalLocation, FVector::OneVector);
 }
@@ -482,7 +484,14 @@ FIntPoint AASnakeGridwalkerPawn::PeekNextHeadCell() const
 
 void AASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
 {
-	SetActorLocation(CellToWorld(NextHeadCell));
+	if (!GridManager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot reset snake: no GridManager assigned."));
+		bIsAlive = false;
+		return;
+	}
+
+	SetActorLocation(GridManager->CellToWorld(NextHeadCell));
 }
 
 void AASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
@@ -502,12 +511,27 @@ void AASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
 
 void AASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 {
+	/*
+	// maybe check for death state here instead of early out return to let snake walk into walls visually 
+	if (!bIsAlive)
+	{
+		return;
+	}
+	*/
 	ApplyPendingDirection();
 
 	const FIntPoint NextHeadCell = PeekNextHeadCell();
 
 	// later:
 	// if (!CanEnterCell(NextHeadCell)) { handle death/block; return; }
+
+	// MVP board bounds check
+	if (GridManager && !GridManager->IsInBounds(NextHeadCell))
+	{
+		bIsAlive = false;
+		return;
+	}
+
 
 	const FIntPoint PreviousHeadCell = GridCellHeadPosition;
 	const FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridCellHeadPosition;
