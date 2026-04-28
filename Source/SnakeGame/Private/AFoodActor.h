@@ -6,15 +6,17 @@
 #include "GameFramework/Actor.h"
 #include "AFoodActor.generated.h"
 
-//class ASnakeGridwalkerPawn;
+class AAFoodActor; // need this since the delegate uses AAFoodActor* before the class? 
 class USphereComponent;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
+
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FFoodConsumedSignature,
 	AAFoodActor*, Food,
 	AActor*, ConsumerActor);
+
 
 UCLASS()
 class AAFoodActor : public AActor
@@ -41,9 +43,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Pickups|Food")
 	FIntPoint GetFoodGridPosition() const { return FoodGridPosition; }
 
-	bool HasActiveStatus() const { return bIsActive; }
+	UFUNCTION(BlueprintPure, Category = "Pickups|Food")
+	bool IsActive() const { return bIsActive; }
+
+	UFUNCTION(BlueprintPure, Category = "Pickups|Food")
 	int32 GetScoreValue() const { return ScoreValue; }
+
+	UFUNCTION(BlueprintPure, Category = "Pickups|Food")
 	int32 GetGrowthValue() const { return GrowthValue; }
+
+	UFUNCTION(BlueprintPure, Category = "Pickups|Food")
+	float GetPlacementHalfHeight() const;
 
 	// --- Logic setters --- 
 	UFUNCTION(BlueprintCallable, Category = "Pickups|Food")

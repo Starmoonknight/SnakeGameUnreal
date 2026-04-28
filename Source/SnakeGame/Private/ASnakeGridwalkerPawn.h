@@ -8,6 +8,7 @@
 #include "InputActionValue.h"
 #include "ASnakeGridwalkerPawn.generated.h"
 
+class AASnakeGridwalkerPawn;
 class AAGridManagerActor;
 
 class UStaticMesh;
@@ -20,6 +21,10 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FSnakeDiedSignature,
+	AASnakeGridwalkerPawn*, Snake);
 
 UENUM(BlueprintType)
 enum class EGridDirection : uint8
@@ -51,8 +56,16 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	// --- Setup --- 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	UFUNCTION(BlueprintCallable, Category = "Snake|Setup")
+	void ConfigureForGrid(AAGridManagerActor* InGridManager, const FIntPoint& InSpawnCell);
+
+	// --- Events --- 
+	UPROPERTY(BlueprintAssignable, Category = "Snake|Events")
+	FSnakeDiedSignature OnSnakeDied;
 
 	// --- Information getters ---
 #pragma region Snake Queries
@@ -91,6 +104,15 @@ public:
 #pragma endregion
 
 	// --- Logic setters --- 
+	UFUNCTION(BlueprintCallable, Category = "Snake|Movement")
+	void StartMovement();
+
+	UFUNCTION(BlueprintCallable, Category = "Snake|Movement")
+	void StopMovement();
+
+	UFUNCTION(BlueprintCallable, Category="Snake|Movement")
+	void SetMovementPaused(bool bPaused);
+
 	UFUNCTION(BlueprintCallable, Category="Snake")
 	void ResetSnake();
 
@@ -98,15 +120,26 @@ public:
 	void RequestGrowth(int32 Amount = 1);
 
 private:
+	// Setup
+	void ApplyVisualAssets();
+	void SetupInputMapping();
+
 	// Helpers
 	FTransform MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const;
 	static EGridDirection ResolveDirectionFromInput(const FVector2D& Input);
 
-	// Input callbacks 
+	// Input Callbacks 
 	void Input_OnMove(const FInputActionValue& Value);
 	void Input_OnGrowPressed();
 	void Input_OnResetPressed();
 
+	// Location Calibration
+	float GetHeadPlacementHalfHeight() const;
+	float GetBodyPlacementHalfHeight() const;
+	FVector GetHeadWorldLocationForCell(const FIntPoint& Cell) const;
+	FVector GetBodyWorldLocationForCell(const FIntPoint& Cell) const;
+
+	// Visuals
 	void StartHeadTurnVisual(EGridDirection NewDirection);
 	void UpdateHeadTurnVisual(float DeltaTime);
 
@@ -114,19 +147,21 @@ private:
 	void UpdateBodyVisualTransforms();
 	void SyncBodyVisuals();
 
+	// Gameplay
 	bool TryConsumeGrowth();
-	void ApplyPendingDirection();
-	FIntPoint PeekNextHeadCell() const;
+	EGridDirection DetermineDesiredDirection() const;
+	FIntPoint PeekNextHeadCell(const EGridDirection Direction) const;
+	void HandleDeath();
 
 	void UpdateHeadWorldLocation(const FIntPoint& NextHeadCell);
 	void AdvanceBodySegments(FIntPoint VacatedCell);
 	void AdvanceSnakeOneStep();
 
-
-	UPROPERTY(EditAnywhere, Category = "SnakeBody|References", meta=(AllowPrivateAccess="true"))
+	// --- Properties ---
+	UPROPERTY(EditInstanceOnly, Category = "SnakeBody|References", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<AAGridManagerActor> GridManager;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SnakeBody|Assets",
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SnakeBody|Assets", // change from EditDefaultsOnly?  
 		meta = (AllowPrivateAccess = "true")) // place for actually assigning the mesh used
 	TObjectPtr<UStaticMesh> HeadMeshAsset;
 
@@ -213,9 +248,17 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	FIntPoint SpawnCell = FIntPoint::ZeroValue;
 
+	UPROPERTY(VisibleInstanceOnly, Category="Snake|State")
 	FIntPoint GridCellHeadPosition = FIntPoint::ZeroValue;
 
+	UPROPERTY(VisibleInstanceOnly, Category="Snake|State")
 	bool bIsAlive = true;
+
+	UPROPERTY(VisibleInstanceOnly, Category="Snake|State")
+	bool bMovementActive = false;
+
+	UPROPERTY(VisibleInstanceOnly, Category="Snake|State")
+	bool bMovementPaused = false;
 
 	float StepAccumulator = 0.0f;
 	float TurnRotationElapsed = 0.0f;
@@ -231,15 +274,4 @@ private:
 	FVector2D RawMoveInput = FVector2D::ZeroVector;
 	EGridDirection CurrentDirection = EGridDirection::Up;
 	EGridDirection PendingNextDirection = EGridDirection::None;
-
-
-	//TArray<TWeakObjectPtr<>>
-
-	/*
-	FVector CurrentPosition = FVector::ZeroVector;
-	FVector PendingNextPosition = FVector::ZeroVector;
-	
-	FIntPoint CurrentGridCell = FIntPoint::ZeroValue;
-	FIntPoint PendingNextGridCell = FIntPoint::ZeroValue;
-	*/
 };

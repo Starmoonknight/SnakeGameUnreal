@@ -15,6 +15,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "Kismet/GameplayStatics.h"
+
 //#include "Kismet/KismetMathLibrary.h"
 
 
@@ -110,34 +112,7 @@ void AASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	if (SnakeHeadMesh && HeadMeshAsset)
-	{
-		SnakeHeadMesh->SetStaticMesh(HeadMeshAsset);
-		if (HeadMaterialAsset)
-		{
-			SnakeHeadMesh->SetMaterial(0, HeadMaterialAsset);
-		}
-	}
-
-
-	if (VisualSegmentMesh && SegmentMeshAsset)
-	{
-		VisualSegmentMesh->SetStaticMesh(SegmentMeshAsset);
-		if (SegmentMaterialAsset)
-		{
-			VisualSegmentMesh->SetMaterial(0, SegmentMaterialAsset);
-		}
-	}
-
-	if (!GridManager)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Snake has no GridManager assigned. This will break everything."));
-	}
-	else
-	{
-		SpawnCell = GridManager->WorldToCell(GetActorLocation());
-		GridCellHeadPosition = SpawnCell;
-	}
+	ApplyVisualAssets();
 }
 
 // Called when the game starts or when spawned
@@ -146,21 +121,7 @@ void AASnakeGridwalkerPawn::BeginPlay()
 	Super::BeginPlay();
 
 	ResetSnake();
-
-	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
-	{
-		if (ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer())
-		{
-			if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer->GetSubsystem<
-				UEnhancedInputLocalPlayerSubsystem>())
-			{
-				if (DefaultMappingContext)
-				{
-					InputSubsystem->AddMappingContext(DefaultMappingContext, 0);
-				}
-			}
-		}
-	}
+	SetupInputMapping();
 }
 
 // Called every frame
@@ -175,9 +136,15 @@ void AASnakeGridwalkerPawn::Tick(float DeltaTime)
 
 	UpdateHeadTurnVisual(DeltaTime);
 
+	if (!bMovementActive || bMovementPaused)
+	{
+		return;
+	}
+
 	StepAccumulator += DeltaTime;
+
 	// using while instead of if case should make the movement work even if laggy and low fps? 
-	while (StepAccumulator >= StepInterval)
+	while (bIsAlive && StepAccumulator >= StepInterval)
 	{
 		StepAccumulator -= StepInterval;
 		AdvanceSnakeOneStep();
@@ -216,6 +183,13 @@ void AASnakeGridwalkerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInp
 	}
 }
 
+void AASnakeGridwalkerPawn::ConfigureForGrid(AAGridManagerActor* InGridManager, const FIntPoint& InSpawnCell)
+{
+	GridManager = InGridManager;
+	SpawnCell = InSpawnCell;
+	GridCellHeadPosition = InSpawnCell;
+}
+
 bool AASnakeGridwalkerPawn::TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const
 {
 	if (!BodyCells.IsValidIndex(SegmentIndex))
@@ -234,6 +208,40 @@ bool AASnakeGridwalkerPawn::TryFindBodyIndexAtCell(const FIntPoint& Cell, int32&
 	return OutSegmentIndex != INDEX_NONE;
 }
 
+void AASnakeGridwalkerPawn::StartMovement()
+{
+	if (!bIsAlive)
+	{
+		return;
+	}
+
+	bMovementActive = true;
+	bMovementPaused = false;
+	StepAccumulator = 0.0f;
+}
+
+void AASnakeGridwalkerPawn::StopMovement()
+{
+	if (!bIsAlive)
+	{
+		return;
+	}
+
+	bMovementActive = false;
+	bMovementPaused = false;
+	StepAccumulator = 0.0f;
+}
+
+void AASnakeGridwalkerPawn::SetMovementPaused(bool bPaused)
+{
+	if (!bIsAlive)
+	{
+		return;
+	}
+
+	bMovementPaused = bPaused;
+}
+
 void AASnakeGridwalkerPawn::ResetSnake()
 {
 	if (!GridManager)
@@ -244,6 +252,8 @@ void AASnakeGridwalkerPawn::ResetSnake()
 	}
 
 	bIsAlive = true;
+	bMovementActive = true; // this is currently fighting setup and pause, etc. 
+	bMovementPaused = false;
 
 	StepAccumulator = 0.0f;
 	TurnRotationElapsed = 0.0f;
@@ -261,7 +271,7 @@ void AASnakeGridwalkerPawn::ResetSnake()
 	TurnStartYaw = DirectionToYaw(CurrentDirection);
 	TurnTargetYaw = TurnStartYaw;
 
-	SetActorLocation(GridManager->CellToWorld(GridCellHeadPosition));
+	SetActorLocation(GetHeadWorldLocationForCell(GridCellHeadPosition));
 
 	if (SnakeHeadMesh)
 	{
@@ -284,6 +294,45 @@ void AASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 	PendingGrowth += Amount;
 }
 
+void AASnakeGridwalkerPawn::ApplyVisualAssets()
+{
+	if (SnakeHeadMesh && HeadMeshAsset)
+	{
+		SnakeHeadMesh->SetStaticMesh(HeadMeshAsset);
+		if (HeadMaterialAsset)
+		{
+			SnakeHeadMesh->SetMaterial(0, HeadMaterialAsset);
+		}
+	}
+
+	if (VisualSegmentMesh && SegmentMeshAsset)
+	{
+		VisualSegmentMesh->SetStaticMesh(SegmentMeshAsset);
+		if (SegmentMaterialAsset)
+		{
+			VisualSegmentMesh->SetMaterial(0, SegmentMaterialAsset);
+		}
+	}
+}
+
+void AASnakeGridwalkerPawn::SetupInputMapping()
+{
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		if (ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer())
+		{
+			if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer->GetSubsystem<
+				UEnhancedInputLocalPlayerSubsystem>())
+			{
+				if (DefaultMappingContext)
+				{
+					InputSubsystem->AddMappingContext(DefaultMappingContext, 0);
+				}
+			}
+		}
+	}
+}
+
 
 FTransform AASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const
 {
@@ -294,7 +343,7 @@ FTransform AASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint
 		return FTransform::Identity;
 	}
 
-	const FVector BodyWorldLocation = GridManager->CellToWorld(BodyCell);
+	const FVector BodyWorldLocation = GetBodyWorldLocationForCell(BodyCell);
 
 	// take this world-space position and convert it into the snake actor's local space
 	const FVector LocalLocation = GetActorTransform().InverseTransformPosition(BodyWorldLocation);
@@ -344,6 +393,38 @@ void AASnakeGridwalkerPawn::Input_OnGrowPressed()
 void AASnakeGridwalkerPawn::Input_OnResetPressed()
 {
 	ResetSnake();
+}
+
+float AASnakeGridwalkerPawn::GetHeadPlacementHalfHeight() const
+{
+	if (!CollisionSphere)
+	{
+		return 0.0f;
+	}
+
+	return CollisionSphere->GetScaledSphereRadius();
+}
+
+float AASnakeGridwalkerPawn::GetBodyPlacementHalfHeight() const
+{
+	return GetHeadPlacementHalfHeight(); // Temp since the segments are still only visuals
+}
+
+FVector AASnakeGridwalkerPawn::GetHeadWorldLocationForCell(const FIntPoint& Cell) const
+{
+	if (!GridManager)
+	{
+		return GetActorLocation();
+	}
+
+	FVector GridLocation = GridManager->CellToWorld(Cell);
+	GridLocation.Z += GetHeadPlacementHalfHeight();
+	return GridLocation;
+}
+
+FVector AASnakeGridwalkerPawn::GetBodyWorldLocationForCell(const FIntPoint& Cell) const
+{
+	return GetHeadWorldLocationForCell(Cell); // Temp since the segments are still only visuals
 }
 
 void AASnakeGridwalkerPawn::StartHeadTurnVisual(EGridDirection NewDirection)
@@ -460,26 +541,27 @@ bool AASnakeGridwalkerPawn::TryConsumeGrowth()
 	return true;
 }
 
-void AASnakeGridwalkerPawn::ApplyPendingDirection()
+EGridDirection AASnakeGridwalkerPawn::DetermineDesiredDirection() const
 {
-	// Assign heading direction, and update rotation if direction changed
+	// Choose which direction this step should try to use.
 	if (PendingNextDirection != EGridDirection::None &&
 		!Reversing(CurrentDirection, PendingNextDirection))
 	{
-		if (CurrentDirection != PendingNextDirection)
-		{
-			StartHeadTurnVisual(PendingNextDirection);
-		}
-		CurrentDirection = PendingNextDirection;
+		return PendingNextDirection;
 	}
 
-	// consume active direction-change input
-	PendingNextDirection = EGridDirection::None;
+	return CurrentDirection;
 }
 
-FIntPoint AASnakeGridwalkerPawn::PeekNextHeadCell() const
+FIntPoint AASnakeGridwalkerPawn::PeekNextHeadCell(const EGridDirection Direction) const
 {
-	return GridCellHeadPosition + GridDelta(CurrentDirection);
+	return GridCellHeadPosition + GridDelta(Direction);
+}
+
+void AASnakeGridwalkerPawn::HandleDeath()
+{
+	OnSnakeDied.Broadcast(this);
+	ResetSnake();
 }
 
 void AASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
@@ -491,7 +573,7 @@ void AASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCel
 		return;
 	}
 
-	SetActorLocation(GridManager->CellToWorld(NextHeadCell));
+	SetActorLocation(GetHeadWorldLocationForCell(NextHeadCell));
 }
 
 void AASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
@@ -511,35 +593,46 @@ void AASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
 
 void AASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 {
+	if (!GridManager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot advance snake: no GridManager assigned."));
+		bIsAlive = false;
+		return;
+	}
+
 	/*
-	// maybe check for death state here instead of early out return to let snake walk into walls visually 
+	// maybe check for death state here instead of the early out return below, to let snake walk into walls visually 
 	if (!bIsAlive)
 	{
 		return;
 	}
 	*/
-	ApplyPendingDirection();
 
-	const FIntPoint NextHeadCell = PeekNextHeadCell();
+	const EGridDirection DesiredDirection = DetermineDesiredDirection();
+	const FIntPoint NextHeadCell = PeekNextHeadCell(DesiredDirection);
+
+	// consume input after registering it 
+	PendingNextDirection = EGridDirection::None;
 
 	// later:
 	// if (!CanEnterCell(NextHeadCell)) { handle death/block; return; }
-
 	// MVP board bounds check
-	if (GridManager && !GridManager->IsInBounds(NextHeadCell))
+	if (!GridManager->IsInBounds(NextHeadCell))
 	{
 		bIsAlive = false;
+		HandleDeath();
 		return;
 	}
 
-
+	const bool bDirectionChanged = CurrentDirection != DesiredDirection;
 	const FIntPoint PreviousHeadCell = GridCellHeadPosition;
 	const FIntPoint PreviousTailCell = BodyCells.Num() > 0 ? BodyCells.Last() : GridCellHeadPosition;
 
 	// --- Commit gameplay truth / Logic state, ---
+	CurrentDirection = DesiredDirection;
 	GridCellHeadPosition = NextHeadCell;
-	AdvanceBodySegments(PreviousHeadCell);
 
+	AdvanceBodySegments(PreviousHeadCell);
 	const bool bGrewThisStep = TryConsumeGrowth();
 	if (bGrewThisStep)
 	{
@@ -547,12 +640,15 @@ void AASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 	}
 
 	// --- Update Visual / World-Sync after all logic ---
+	if (bDirectionChanged)
+	{
+		StartHeadTurnVisual(DesiredDirection);
+	}
 	UpdateHeadWorldLocation(NextHeadCell);
 
 	if (bGrewThisStep)
 	{
 		AddBodyVisualSegment(PreviousTailCell);
 	}
-
 	UpdateBodyVisualTransforms();
 }

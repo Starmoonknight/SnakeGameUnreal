@@ -43,6 +43,16 @@ void AAFoodActor::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+float AAFoodActor::GetPlacementHalfHeight() const
+{
+	if (!CollisionSphere)
+	{
+		return 0.0f;
+	}
+
+	return CollisionSphere->GetScaledSphereRadius();
+}
+
 void AAFoodActor::SetFoodGridPosition(const FIntPoint& NewGridPosition, const FVector& NewWorldLocation)
 {
 	FoodGridPosition = NewGridPosition;

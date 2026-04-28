@@ -8,6 +8,7 @@
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include  "Components/InstancedStaticMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 
 namespace
@@ -24,8 +25,12 @@ namespace
 		float WallThickness = 0.f;
 	};
 
-	constexpr uint32 FruitSeedTag = 0xF17E1234u;
+	constexpr uint32 FruitSeedTag = 0xF17E1234u; // a random hexadecimal, just need to be distinct 
+	//RootSeed + FruitTag -> fruit seed
+	//RootSeed + WallTag  -> wall seed
+	//RootSeed + EnemyTag -> enemy seed
 
+	// Deterministic scrambling function, takes two numbers and mixes them into a new number
 	uint32 MixSeed(uint32 Seed, uint32 Tag)
 	{
 		Seed ^= Tag + 0x9E3779B9u + (Seed << 6) + (Seed >> 2);
@@ -120,11 +125,14 @@ void AAGridManagerActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-
 	FoodRandomStream.Initialize(MakeSubsystemSeed(RootSeed, FruitSeedTag));
+
 	InitializeCells();
 
+	PlaceSnakeOnGrid();
 	RespawnFruit_Temp();
+
+	StartGameLoop();
 }
 
 // Called every frame
@@ -160,13 +168,18 @@ FIntPoint AAGridManagerActor::WorldToCell(const FVector& WorldLocation) const
 
 bool AAGridManagerActor::IsCellBlockedByBoard(const FIntPoint& Cell) const
 {
+	if (!IsInBounds(Cell))
+	{
+		return true;
+	}
+
 	return Cells[FlatIndex(Cell)] == EGridCellType::Blocked;
 }
 
 bool AAGridManagerActor::IsFoodAtCell_Temp(const FIntPoint& Cell) const
 {
 	return IsValid(CurrentFood)
-		&& CurrentFood->HasActiveStatus()
+		&& CurrentFood->IsActive()
 		&& CurrentFood->GetFoodGridPosition() == Cell;
 }
 
@@ -190,13 +203,13 @@ Index < GridDimensions.X * GridDimensions.Y
 void AAGridManagerActor::RespawnFruit_Temp()
 {
 	FIntPoint NewFoodCell;
-	if (!TryFindRandomFreeCell(NewFoodCell))
+	if (!TryFindRandomFreeCell_Temp(NewFoodCell))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("No valid free cell found for fruit."));
 		return;
 	}
 
-	SpawnFruitAtCell_Temp(NewFoodCell);
+	SpawnFruitAtCellDestructive_Temp(NewFoodCell);
 }
 
 void AAGridManagerActor::HandleFruitConsumed_Temp(AAFoodActor* Food, AActor* ConsumerActor)
@@ -251,7 +264,80 @@ UStaticMesh* AAGridManagerActor::GetFloorMeshToUse() const
 	return FallbackPlaneMesh;
 }
 
-bool AAGridManagerActor::TryFindRandomFreeCell(FIntPoint& OutCell)
+void AAGridManagerActor::PlaceSnakeOnGrid()
+{
+	if (IsValid(Snake))
+	{
+		return;
+	}
+
+	if (!SnakeClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("GridManager has no SnakeClass assigned."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FIntPoint SpawnCell = FIntPoint::ZeroValue;
+
+	if (SnakeSpawnPoint)
+	{
+		SpawnCell = WorldToCell(SnakeSpawnPoint->GetActorLocation());
+	}
+
+	// need to align to propper cell placement first
+	if (!IsInBounds(SpawnCell))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Snake spawn location was outside the grid. Falling back to cell 0,0."));
+		SpawnCell = FIntPoint::ZeroValue;
+	}
+
+	const FVector SpawnLocation = CellToWorld(SpawnCell);
+	const FRotator SpawnRotator = FRotator::ZeroRotator;
+	const FTransform SpawnTransform(SpawnRotator, SpawnLocation);
+
+	AASnakeGridwalkerPawn* NewSnake =
+		World->SpawnActorDeferred<AASnakeGridwalkerPawn>(
+			SnakeClass,
+			SpawnTransform,
+			nullptr,
+			nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+
+	if (!NewSnake)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to spawn snake."));
+		return;
+	}
+
+	NewSnake->ConfigureForGrid(this, SpawnCell);
+
+	UGameplayStatics::FinishSpawningActor(NewSnake, SpawnTransform);
+
+	Snake = NewSnake;
+}
+
+bool AAGridManagerActor::CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const
+{
+	if (!IsInBounds(Cell))
+	{
+		return false;
+	}
+
+	const bool bBlocked =
+		IsCellBlockedByBoard(Cell)
+		|| IsFoodAtCell_Temp(Cell)
+		|| (Snake && Snake->IsSnakeAtCell(Cell));
+
+	return !bBlocked;
+}
+
+bool AAGridManagerActor::TryFindRandomFreeCell_Temp(FIntPoint& OutCell)
 {
 	TArray<FIntPoint> CandidateCells;
 	CandidateCells.Reserve(GetCellCount());
@@ -280,22 +366,9 @@ bool AAGridManagerActor::TryFindRandomFreeCell(FIntPoint& OutCell)
 	return true;
 }
 
-bool AAGridManagerActor::CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const
-{
-	if (!IsInBounds(Cell))
-	{
-		return false;
-	}
+// can only be one fruit at this stage, so destroys previous if still active 
 
-	const bool bBlocked =
-		IsCellBlockedByBoard(Cell)
-		|| IsFoodAtCell_Temp(Cell)
-		|| (Snake && Snake->IsSnakeAtCell(Cell));
-
-	return !bBlocked;
-}
-
-void AAGridManagerActor::SpawnFruitAtCell_Temp(const FIntPoint& Cell)
+void AAGridManagerActor::SpawnFruitAtCellDestructive_Temp(const FIntPoint& Cell)
 {
 	if (!FoodClass)
 	{
@@ -315,11 +388,12 @@ void AAGridManagerActor::SpawnFruitAtCell_Temp(const FIntPoint& Cell)
 		CurrentFood = nullptr;
 	}
 
-	const FVector SpawnLocation = CellToWorld(Cell);
+	FVector SpawnLocation = CellToWorld(Cell);
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 
+	// will be placed inside floor at first
 	CurrentFood = World->SpawnActor<AAFoodActor>(
 		FoodClass,
 		SpawnLocation,
@@ -332,7 +406,10 @@ void AAGridManagerActor::SpawnFruitAtCell_Temp(const FIntPoint& Cell)
 		return;
 	}
 
-	CurrentFood->SetFoodGridPosition(Cell, CellToWorld(Cell));
+	// can only query the spawned actor's component size after it exists.
+	SpawnLocation.Z += CurrentFood->GetPlacementHalfHeight();
+
+	CurrentFood->SetFoodGridPosition(Cell, SpawnLocation);
 	CurrentFood->SetFoodValues(1, 1);
 	CurrentFood->SetActiveStatus(true);
 
@@ -416,4 +493,15 @@ void AAGridManagerActor::SetupGridVisuals_Stretchy()
 
 	WestWallVisual->SetWorldScale3D(FVector(1.0f, GridDimensions.Y, 1.0f));
 	WestWallVisual->SetWorldLocation(WestLocation);
+}
+
+void AAGridManagerActor::StartGameLoop()
+{
+	if (!IsValid(Snake))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot start game loop: no snake."));
+		return;
+	}
+
+	Snake->StartMovement();
 }

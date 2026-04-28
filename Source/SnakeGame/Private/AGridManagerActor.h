@@ -84,16 +84,32 @@ private:
 	UStaticMesh* GetWallMeshToUse() const;
 	UStaticMesh* GetFloorMeshToUse() const;
 
-	bool TryFindRandomFreeCell(FIntPoint& OutCell);
+	void PlaceSnakeOnGrid();
+
 	bool CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const;
-	void SpawnFruitAtCell_Temp(const FIntPoint& Cell);
+	bool TryFindRandomFreeCell_Temp(FIntPoint& OutCell);
+	void SpawnFruitAtCellDestructive_Temp(const FIntPoint& Cell);
 
 	// board setup 
 	void InitializeCells();
 	void BuildTiledFloor();
 	void SetupGridVisuals_Stretchy();
 
-	UPROPERTY(EditInstanceOnly, Category = "Grid|References", meta=(AllowPrivateAccess="true"))
+	// Game 
+	void StartGameLoop();
+	void StopGameLoop();
+
+	// Add in a spawn point to grid later, that snake can access for start location. 
+	// Fix height, rotation and direction to be grid-reliant instead of world space?  
+
+	UPROPERTY(EditInstanceOnly, Category = "Grid|Snake", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<AActor> SnakeSpawnPoint;
+
+	UPROPERTY(EditInstanceOnly, Category = "Grid|Snake", meta=(AllowPrivateAccess="true"))
+	TSubclassOf<AASnakeGridwalkerPawn> SnakeClass;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Grid|Snake",
+		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<AASnakeGridwalkerPawn> Snake;
 
 	UPROPERTY(EditAnywhere, Category = "Grid|Food", meta = (AllowPrivateAccess = "true"))
