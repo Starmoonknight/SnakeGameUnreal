@@ -78,13 +78,16 @@ private:
 	UFUNCTION()
 	void HandleFruitConsumed_Temp(AAFoodActor* Food, AActor* ConsumerActor);
 
+	UFUNCTION()
+	void HandleSnakeDeath_Temp(AASnakeGridwalkerPawn* DeadSnake);
+
 	int32 FlatIndex(const FIntPoint& Cell) const;
 	FIntPoint IndexToCellCoord(const int32 Index) const;
 
 	UStaticMesh* GetWallMeshToUse() const;
 	UStaticMesh* GetFloorMeshToUse() const;
 
-	void PlaceSnakeOnGrid();
+	void PlaceSnakeOnGrid_Temp();
 
 	bool CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const;
 	bool TryFindRandomFreeCell_Temp(FIntPoint& OutCell);
@@ -96,8 +99,8 @@ private:
 	void SetupGridVisuals_Stretchy();
 
 	// Game 
-	void StartGameLoop();
-	void StopGameLoop();
+	void StartGameLoop_Temp();
+	void StopGameLoop_Temp();
 
 	// Add in a spawn point to grid later, that snake can access for start location. 
 	// Fix height, rotation and direction to be grid-reliant instead of world space?  
@@ -115,6 +118,8 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Grid|Food", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AAFoodActor> FoodClass;
 
+	// Grid owns the current spawned food reference for this MVP.
+	// Food broadcasts when consumed; grid responds by spawning the next fruit.
 	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Grid|Food",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AAFoodActor> CurrentFood;

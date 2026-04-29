@@ -222,11 +222,6 @@ void AASnakeGridwalkerPawn::StartMovement()
 
 void AASnakeGridwalkerPawn::StopMovement()
 {
-	if (!bIsAlive)
-	{
-		return;
-	}
-
 	bMovementActive = false;
 	bMovementPaused = false;
 	StepAccumulator = 0.0f;
@@ -234,11 +229,6 @@ void AASnakeGridwalkerPawn::StopMovement()
 
 void AASnakeGridwalkerPawn::SetMovementPaused(bool bPaused)
 {
-	if (!bIsAlive)
-	{
-		return;
-	}
-
 	bMovementPaused = bPaused;
 }
 
@@ -252,7 +242,7 @@ void AASnakeGridwalkerPawn::ResetSnake()
 	}
 
 	bIsAlive = true;
-	bMovementActive = true; // this is currently fighting setup and pause, etc. 
+	bMovementActive = false;
 	bMovementPaused = false;
 
 	StepAccumulator = 0.0f;
@@ -393,6 +383,7 @@ void AASnakeGridwalkerPawn::Input_OnGrowPressed()
 void AASnakeGridwalkerPawn::Input_OnResetPressed()
 {
 	ResetSnake();
+	StartMovement();
 }
 
 float AASnakeGridwalkerPawn::GetHeadPlacementHalfHeight() const
@@ -560,8 +551,14 @@ FIntPoint AASnakeGridwalkerPawn::PeekNextHeadCell(const EGridDirection Direction
 
 void AASnakeGridwalkerPawn::HandleDeath()
 {
+	if (!bIsAlive)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Snake triggered HandleDeath() after death "));
+		return;
+	}
+
+	bIsAlive = false;
 	OnSnakeDied.Broadcast(this);
-	ResetSnake();
 }
 
 void AASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
@@ -619,7 +616,6 @@ void AASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 	// MVP board bounds check
 	if (!GridManager->IsInBounds(NextHeadCell))
 	{
-		bIsAlive = false;
 		HandleDeath();
 		return;
 	}

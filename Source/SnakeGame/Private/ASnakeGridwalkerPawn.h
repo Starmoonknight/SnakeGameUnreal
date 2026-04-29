@@ -22,6 +22,24 @@ class UInputMappingContext;
 class UInputAction;
 
 
+// Delegate cleanup note:
+// RemoveDynamic and RemoveAll are both called on one specific delegate.
+//
+// RemoveDynamic(this, &ThisClass::FunctionName)
+// removes one exact listener-object + function binding from that delegate.
+//
+// RemoveAll(this)
+// removes all bindings from that delegate where this object is the listener.
+// It does not remove this object from other delegates on the same broadcaster.
+//
+// Example:
+// Snake->OnSnakeDied.RemoveAll(this) only affects OnSnakeDied.
+// It does not affect Snake->OnSnakeSpawned or Snake->OnSnakeStateChanged.
+// 
+// Naming:
+// F is recommended naming convention prefix for Unreal types. 
+// Signature suffix is just a name, not required syntax, but it is clear because 
+// this type describes the delegate callback signature.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FSnakeDiedSignature,
 	AASnakeGridwalkerPawn*, Snake);
@@ -82,7 +100,17 @@ public:
 	FIntPoint GetHeadCellPosition() const { return GridCellHeadPosition; }
 
 	UFUNCTION(BlueprintPure, Category="Snake")
-	const TArray<FIntPoint>& GetBodyCellPositions() const { return BodyCells; }
+	TArray<FIntPoint> GetBodyCellPositions() const { return BodyCells; }
+
+	// C++ note:
+	// A C++-only getter could return:
+	// const TArray<FIntPoint>& GetBodyCellPositionsRef() const { return BodyCells; }	
+	//
+	// Could have used const TArray<FIntPoint>& but that is less safe with UFUNCTION blueprint usage? BodyCells is small so also fine for now to return a copy:
+	//		"That would avoid copying, but it returns a borrowed reference to the snake's internal array.
+	//		For a Blueprint-facing UFUNCTION, returning the array by value is simpler and safer because
+	//		Blueprint receives its own copy instead of depending on C++ reference/lifetime behavior.
+	//		BodyCells is small in this project, so the copy is fine for now."
 
 	// Occupancy
 	UFUNCTION(BlueprintPure, Category="Snake")
@@ -151,6 +179,7 @@ private:
 	bool TryConsumeGrowth();
 	EGridDirection DetermineDesiredDirection() const;
 	FIntPoint PeekNextHeadCell(const EGridDirection Direction) const;
+
 	void HandleDeath();
 
 	void UpdateHeadWorldLocation(const FIntPoint& NextHeadCell);

@@ -129,10 +129,10 @@ void AAGridManagerActor::BeginPlay()
 
 	InitializeCells();
 
-	PlaceSnakeOnGrid();
+	PlaceSnakeOnGrid_Temp();
 	RespawnFruit_Temp();
 
-	StartGameLoop();
+	StartGameLoop_Temp();
 }
 
 // Called every frame
@@ -214,6 +214,9 @@ void AAGridManagerActor::RespawnFruit_Temp()
 
 void AAGridManagerActor::HandleFruitConsumed_Temp(AAFoodActor* Food, AActor* ConsumerActor)
 {
+	// Defensive guard note:
+	// This delegate should only be bound to CurrentFood, but this prevents stale,
+	// duplicate, or wrong-instance events from affecting this grid.
 	if (Food != CurrentFood)
 	{
 		return;
@@ -221,6 +224,17 @@ void AAGridManagerActor::HandleFruitConsumed_Temp(AAFoodActor* Food, AActor* Con
 
 	CurrentFood = nullptr;
 	RespawnFruit_Temp();
+}
+
+void AAGridManagerActor::HandleSnakeDeath_Temp(AASnakeGridwalkerPawn* DeadSnake)
+{
+	if (DeadSnake != Snake)
+	{
+		return;
+	}
+
+	// VERY TEMP SOLUTION! snake does not die yet, just resets its state to start version for now. 
+	StartGameLoop_Temp();
 }
 
 int32 AAGridManagerActor::FlatIndex(const FIntPoint& Cell) const
@@ -264,7 +278,7 @@ UStaticMesh* AAGridManagerActor::GetFloorMeshToUse() const
 	return FallbackPlaneMesh;
 }
 
-void AAGridManagerActor::PlaceSnakeOnGrid()
+void AAGridManagerActor::PlaceSnakeOnGrid_Temp()
 {
 	if (IsValid(Snake))
 	{
@@ -320,6 +334,10 @@ void AAGridManagerActor::PlaceSnakeOnGrid()
 	UGameplayStatics::FinishSpawningActor(NewSnake, SpawnTransform);
 
 	Snake = NewSnake;
+
+	// is this the safe pattern to avoid accidental double-binding
+	Snake->OnSnakeDied.RemoveDynamic(this, &AAGridManagerActor::HandleSnakeDeath_Temp);
+	Snake->OnSnakeDied.AddDynamic(this, &AAGridManagerActor::HandleSnakeDeath_Temp);
 }
 
 bool AAGridManagerActor::CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const
@@ -384,6 +402,8 @@ void AAGridManagerActor::SpawnFruitAtCellDestructive_Temp(const FIntPoint& Cell)
 
 	if (IsValid(CurrentFood))
 	{
+		CurrentFood->OnFruitConsumed.RemoveDynamic(this, &AAGridManagerActor::HandleFruitConsumed_Temp);
+
 		CurrentFood->Destroy();
 		CurrentFood = nullptr;
 	}
@@ -495,7 +515,7 @@ void AAGridManagerActor::SetupGridVisuals_Stretchy()
 	WestWallVisual->SetWorldLocation(WestLocation);
 }
 
-void AAGridManagerActor::StartGameLoop()
+void AAGridManagerActor::StartGameLoop_Temp()
 {
 	if (!IsValid(Snake))
 	{
@@ -503,5 +523,17 @@ void AAGridManagerActor::StartGameLoop()
 		return;
 	}
 
+	Snake->ResetSnake();
 	Snake->StartMovement();
+}
+
+void AAGridManagerActor::StopGameLoop_Temp()
+{
+	if (!IsValid(Snake))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot start game loop: no snake."));
+		return;
+	}
+
+	Snake->StopMovement();
 }
