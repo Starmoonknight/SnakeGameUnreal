@@ -261,6 +261,16 @@ void AASnakeGridwalkerPawn::ResetSnake()
 	TurnStartYaw = DirectionToYaw(CurrentDirection);
 	TurnTargetYaw = TurnStartYaw;
 
+	/*
+	if (StartupSettings != nullptr)
+	{
+		StepInterval = StartupSettings.StepInterval;
+		TurnDuration = StartupSettings.TurnDuration;
+		CurrentDirection = StartupSettings.StartingDirection;
+		PendingGrowth = StartupSettings.StartingGrowth;
+	}
+	*/
+
 	SetActorLocation(GetHeadWorldLocationForCell(GridCellHeadPosition));
 
 	if (SnakeHeadMesh)

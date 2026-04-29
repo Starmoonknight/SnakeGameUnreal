@@ -54,6 +54,27 @@ enum class EGridDirection : uint8
 	None // None = no valid input this step, remember to not use as a pause or add more choices 
 };
 
+USTRUCT(BlueprintType)
+struct FSnakeStartupSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement",
+		meta = (ClampMin = "0.01", UIMin = "0.01"))
+	float StepInterval = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement",
+		meta = (ClampMin = "0.01", UIMin = "0.01"))
+	float TurnDuration = 0.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	EGridDirection StartingDirection = EGridDirection::Up;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Growth",
+		meta = (ClampMin = "0", UIMin = "0"))
+	int32 StartingGrowth = 0;
+};
+
 
 UCLASS()
 class AASnakeGridwalkerPawn : public APawn
@@ -132,6 +153,8 @@ public:
 #pragma endregion
 
 	// --- Logic setters --- 
+#pragma region Snake Commands
+
 	UFUNCTION(BlueprintCallable, Category = "Snake|Movement")
 	void StartMovement();
 
@@ -147,7 +170,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Snake")
 	void RequestGrowth(int32 Amount = 1);
 
+#pragma endregion
+
 private:
+#pragma region Functions
 	// Setup
 	void ApplyVisualAssets();
 	void SetupInputMapping();
@@ -186,10 +212,11 @@ private:
 	void AdvanceBodySegments(FIntPoint VacatedCell);
 	void AdvanceSnakeOneStep();
 
-	// --- Properties ---
-	UPROPERTY(EditInstanceOnly, Category = "SnakeBody|References", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<AAGridManagerActor> GridManager;
+#pragma endregion
 
+	// --- Properties ---
+#pragma region Setup-Properties
+	// Snake actor setup
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SnakeBody|Assets", // change from EditDefaultsOnly?  
 		meta = (AllowPrivateAccess = "true")) // place for actually assigning the mesh used
 	TObjectPtr<UStaticMesh> HeadMeshAsset;
@@ -224,19 +251,23 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> Camera;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
+	// Information Providers  
+	UPROPERTY(EditInstanceOnly, Category = "Snake|References", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<AAGridManagerActor> GridManager;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> MoveAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> TestGrowthAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Input",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> TestResetAction;
 
@@ -265,19 +296,25 @@ private:
 	float TurnSpeed = 120.0f;
 	*/
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Movement",
+	// Gameplay Stats
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Movement",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", UIMin = "0.01"))
 	float StepInterval = 0.8f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Movement",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Movement",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", UIMin = "0.01"))
 	float TurnDuration = 0.15f;
+
+#pragma endregion
+
+
+#pragma region Runtime-Properties
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Grid",
 		meta = (AllowPrivateAccess = "true"))
 	FIntPoint SpawnCell = FIntPoint::ZeroValue;
 
-	UPROPERTY(VisibleInstanceOnly, Category="Snake|State")
+	UPROPERTY(VisibleInstanceOnly, Category="Snake|Grid")
 	FIntPoint GridCellHeadPosition = FIntPoint::ZeroValue;
 
 	UPROPERTY(VisibleInstanceOnly, Category="Snake|State")
@@ -303,4 +340,6 @@ private:
 	FVector2D RawMoveInput = FVector2D::ZeroVector;
 	EGridDirection CurrentDirection = EGridDirection::Up;
 	EGridDirection PendingNextDirection = EGridDirection::None;
+
+#pragma endregion
 };

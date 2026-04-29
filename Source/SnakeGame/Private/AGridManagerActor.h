@@ -14,6 +14,40 @@ class UInstancedStaticMeshComponent;
 class UMaterialInterface;
 class USceneComponent;
 
+
+// Test to set up a Primary Data Asset, and from that a Data Asset, that can be used in blueprints 
+// 
+// I think the steps was: 
+// - Make a blueprint of the Primary Data Asset type and name it PDA_GridSettingsData, 
+// - Open the new blueprint -> click plus on Variables -> name the variable "Data" and change the type from bool to GridSettings (since it was visible as a USTRUCT(Blueprintable) type)
+// 
+// - Then make a new blueprint again and select the PDA_GridSettingsData as parent class to make the DA_TestGrid.
+USTRUCT(BlueprintType)
+struct FGridSettings
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
+	FIntPoint GridDimensions = FIntPoint(40, 40);
+
+	UPROPERTY(EditAnywhere, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true"))
+	FVector2D GridOrigin = FVector2D::ZeroVector;
+
+	UPROPERTY(EditAnywhere, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true"))
+	float GridWorldZ = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
+	int32 CellSize = 100;
+
+	UPROPERTY(EditAnywhere, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true"))
+	int32 RootSeed = 12345;
+};
+
+
 UENUM()
 enum class EGridCellType : uint8
 {
