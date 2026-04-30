@@ -2,6 +2,7 @@
 
 //SnakeGridwalkerPawn.cpp
 #include "ASnakeGridwalkerPawn.h"
+#include "SnakeSettingsDataAsset.h"
 
 #include "AGridManagerActor.h"
 #include "Camera/CameraComponent.h"
@@ -120,6 +121,7 @@ void AASnakeGridwalkerPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// snake needs to be spawned by deferred spawning since it uses a reference set in that interaction here
 	ResetSnake();
 	SetupInputMapping();
 }
@@ -249,27 +251,16 @@ void AASnakeGridwalkerPawn::ResetSnake()
 	TurnRotationElapsed = 0.0f;
 	IsTurning = false;
 
-	PendingGrowth = 0;
+	ApplyStartupSettings(GetResolvedStartupSettings());
+
 	BodyCells.Reset();
 
 	RawMoveInput = FVector2D::ZeroVector;
 
 	GridCellHeadPosition = SpawnCell;
-	CurrentDirection = EGridDirection::Up;
-	PendingNextDirection = EGridDirection::None;
 
 	TurnStartYaw = DirectionToYaw(CurrentDirection);
 	TurnTargetYaw = TurnStartYaw;
-
-	/*
-	if (StartupSettings != nullptr)
-	{
-		StepInterval = StartupSettings.StepInterval;
-		TurnDuration = StartupSettings.TurnDuration;
-		CurrentDirection = StartupSettings.StartingDirection;
-		PendingGrowth = StartupSettings.StartingGrowth;
-	}
-	*/
 
 	SetActorLocation(GetHeadWorldLocationForCell(GridCellHeadPosition));
 
@@ -331,6 +322,24 @@ void AASnakeGridwalkerPawn::SetupInputMapping()
 			}
 		}
 	}
+}
+
+void AASnakeGridwalkerPawn::ApplyStartupSettings(const FSnakeStartupSettings& Settings)
+{
+	StepInterval = FMath::Max(Settings.StepInterval, 0.01f);
+	TurnDuration = FMath::Max(Settings.TurnDuration, 0.01f);
+
+	CurrentDirection = Settings.StartingDirection;
+	PendingNextDirection = EGridDirection::None;
+
+	PendingGrowth = Settings.InitialPendingGrowth;
+}
+
+const FSnakeStartupSettings& AASnakeGridwalkerPawn::GetResolvedStartupSettings() const
+{
+	return StartupSettingsPreset
+		       ? StartupSettingsPreset->StartupSettings
+		       : FallbackStartupSettings;
 }
 
 
