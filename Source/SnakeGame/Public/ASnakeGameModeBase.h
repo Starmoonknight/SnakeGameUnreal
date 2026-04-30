@@ -10,13 +10,13 @@
 #include "ASnakeGameModeBase.generated.h"
 
 class AASnakeGridwalkerPawn;
-class AFoodActor;
-class AGridManager;
+class AAFoodActor;
+class AAGridManagerActor;
 class ASnakeGameState;
 
 
 /**
- * 
+ *
  */
 UCLASS()
 class AASnakeGameModeBase : public AGameModeBase
@@ -26,34 +26,88 @@ class AASnakeGameModeBase : public AGameModeBase
 public:
 	virtual void BeginPlay() override;
 
-	UFUNCTION(BlueprintCallable, Category = Snake)
+
+	// --- Information getters ---
+
+	UFUNCTION(BlueprintPure, Category = "Grid|Food")
+	bool IsFoodAtCell(const FIntPoint& Cell) const;
+
+	TArray<FIntPoint> GetAllSnakeOccupiedCells() const;
+	bool AnySnakeOnThisCell(const FIntPoint& Cell) const;
+
+	// --- Logic setters --- 
+
+	UFUNCTION(BlueprintCallable, Category = "Snake")
 	void StartPlayingRun();
 
-	UFUNCTION(BlueprintCallable, Category = Snake)
+	UFUNCTION(BlueprintCallable, Category = "Snake")
 	void RestartRun();
 
-	AASnakeGridwalkerPawn* SpawnSnakeForSlot(int32 SlotIndex, const FIntPoint& SpawnCell);
-	void SpawnSnake();
+	UFUNCTION(BlueprintCallable, Category = "Grid|Food")
+	void RespawnFruit_Temp();
 
 private:
-	UPROPERTY(EditDefaultsOnly, Category = "Snake")
+	void CacheGridManager();
+
+	bool IsCellFreeForGameplay(const FIntPoint& Cell) const;
+	bool TryFindRandomFreeCell(FIntPoint& OutCell);
+	bool TryFindRandomFreeCell_Flexible(FIntPoint& OutCell, const TArray<FIntPoint>& ForbiddenCells,
+	                                    FRandomStream& RandomStream) const;
+
+	void SpawnSnake();
+	void SpawnFruit_Destructive(const FIntPoint& Cell);
+
+	// Game 
+	void StartGameLoop();
+	void StopGameLoop();
+	//void PauseGameLoop();
+
+	UFUNCTION()
+	void HandleFruitConsumed(AAFoodActor* Food, AActor* ConsumerActor);
+
+	UFUNCTION()
+	void HandleSnakeDeath(AASnakeGridwalkerPawn* DeadSnake);
+
+
+	UPROPERTY(EditInstanceOnly, Category = "Snake|Reference",
+		meta=(AllowPrivateAccess="true"))
+	TObjectPtr<AActor> SnakeSpawnPoint;
+
+	UPROPERTY(EditInstanceOnly, Category = "Snake|Reference",
+		meta=(AllowPrivateAccess="true"))
 	TSubclassOf<AASnakeGridwalkerPawn> SnakePawnClass;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Snake")
+	UPROPERTY(EditAnywhere, Category = "Snake|Reference",
+		meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AAFoodActor> FoodActorClass;
 
-	UPROPERTY()
+	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
+		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<AASnakeGridwalkerPawn> SpawnedSnakePawn;
 
-	UPROPERTY()
+	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
+		meta = (AllowPrivateAccess="true"))
+	TArray<TObjectPtr<AASnakeGridwalkerPawn>> SpawnedSnakes;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
+		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AAFoodActor> SpawnedFoodActor;
 
-	UPROPERTY()
-	TObjectPtr<AGridManager> GridManager;
+	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<AAGridManagerActor> GridManager;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true"))
+	int32 RootSeed = 12345;
 
 
 	int32 CurrentStageIndex = 0;
-	int32 PointsThisStage = 0;
-	
-	
+	int32 ScoreThisStage = 0;
+
+	FRandomStream DefaultRandomStream;
+	FRandomStream FoodRandomStream;
+
+	ASnakeGameState* GetSnakeGameState();
 };

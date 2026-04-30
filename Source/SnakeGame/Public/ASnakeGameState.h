@@ -8,7 +8,7 @@
 #include "ASnakeGameState.generated.h"
 
 UENUM(BlueprintType)
-enum class ESnakeGamePhase : uint8
+enum class ESnakeMatchPhase : uint8
 {
 	MainMenu UMETA(DisplayName = "Main Menu"),
 	Playing UMETA(DisplayName = "Playing"),
@@ -18,7 +18,7 @@ enum class ESnakeGamePhase : uint8
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FOnPhaseChangedSignature,
-	ESnakeGamePhase, NewPhase);
+	ESnakeMatchPhase, NewPhase);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FOnScoreChangedSignature,
@@ -29,7 +29,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
  * 
  */
 UCLASS()
-class ASnakeGameStatic : public AGameStateBase
+class ASnakeGameState : public AGameStateBase
 {
 	GENERATED_BODY()
 
@@ -49,14 +49,14 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Snake")
 	int32 PointsToClearStage = 0;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Snake")
+	UPROPERTY(BlueprintAssignable, Category = "Snake")
 	FOnPhaseChangedSignature OnPhaseChanged;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Snake")
+	UPROPERTY(BlueprintAssignable, Category = "Snake")
 	FOnScoreChangedSignature OnScoreChanged;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Snake")
-	ESnakeGamePhase MatchPhase = ESnakeGamePhase::None;
+	ESnakeMatchPhase MatchPhase = ESnakeMatchPhase::None;
 
 	void AddScore(int32 NewScore)
 	{
@@ -64,7 +64,7 @@ public:
 		OnScoreChanged.Broadcast(Score);
 	}
 
-	void SetMatchPhase(ESnakeGamePhase NewPhase)
+	void SetMatchPhase(ESnakeMatchPhase NewPhase)
 	{
 		MatchPhase = NewPhase;
 		OnPhaseChanged.Broadcast(NewPhase);

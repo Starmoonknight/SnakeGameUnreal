@@ -6,8 +6,6 @@
 #include "GameFramework/Actor.h"
 #include "AGridManagerActor.generated.h"
 
-class AAFoodActor;
-class AASnakeGridwalkerPawn;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UInstancedStaticMeshComponent;
@@ -16,6 +14,7 @@ class USceneComponent;
 
 
 // Test to set up a Primary Data Asset, and from that a Data Asset, that can be used in blueprints 
+// Not used in game but keeping in code to remember 
 // 
 // I think the steps was: 
 // - Make a blueprint of the Primary Data Asset type and name it PDA_GridSettingsData, 
@@ -101,63 +100,24 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsCellBlockedByBoard(const FIntPoint& Cell) const;
 
-
-	UFUNCTION(BlueprintPure, Category = "Grid")
-	bool IsFoodAtCell_Temp(const FIntPoint& Cell) const;
-
-	UFUNCTION(BlueprintCallable, Category = "Grid|Food")
-	void RespawnFruit_Temp();
+	void InitializeGridForGameplay();
 
 private:
-	UFUNCTION()
-	void HandleFruitConsumed_Temp(AAFoodActor* Food, AActor* ConsumerActor);
-
-	UFUNCTION()
-	void HandleSnakeDeath_Temp(AASnakeGridwalkerPawn* DeadSnake);
-
 	int32 FlatIndex(const FIntPoint& Cell) const;
 	FIntPoint IndexToCellCoord(const int32 Index) const;
 
 	UStaticMesh* GetWallMeshToUse() const;
 	UStaticMesh* GetFloorMeshToUse() const;
 
-	void PlaceSnakeOnGrid_Temp();
-
-	bool CanPlaceFruitAtCell_Temp(const FIntPoint& Cell) const;
-	bool TryFindRandomFreeCell_Temp(FIntPoint& OutCell);
-	void SpawnFruitAtCellDestructive_Temp(const FIntPoint& Cell);
-
 	// board setup 
 	void InitializeCells();
 	void BuildTiledFloor();
 	void SetupGridVisuals_Stretchy();
 
-	// Game 
-	void StartGameLoop_Temp();
-	void StopGameLoop_Temp();
 
-	// Add in a spawn point to grid later, that snake can access for start location. 
 	// Fix height, rotation and direction to be grid-reliant instead of world space?  
 
-	UPROPERTY(EditInstanceOnly, Category = "Grid|Snake", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<AActor> SnakeSpawnPoint;
-
-	UPROPERTY(EditInstanceOnly, Category = "Grid|Snake", meta=(AllowPrivateAccess="true"))
-	TSubclassOf<AASnakeGridwalkerPawn> SnakeClass;
-
-	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Grid|Snake",
-		meta=(AllowPrivateAccess="true"))
-	TObjectPtr<AASnakeGridwalkerPawn> Snake;
-
-	UPROPERTY(EditAnywhere, Category = "Grid|Food", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<AAFoodActor> FoodClass;
-
-	// Grid owns the current spawned food reference for this MVP.
-	// Food broadcasts when consumed; grid responds by spawning the next fruit.
-	UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "Grid|Food",
-		meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AAFoodActor> CurrentFood;
-
+	// base settings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
 		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	FIntPoint GridDimensions = FIntPoint(40, 40);
@@ -174,10 +134,8 @@ private:
 		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 CellSize = 100;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
-		meta = (AllowPrivateAccess = "true"))
-	int32 RootSeed = 12345;
 
+	// visuals
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
 		meta = (AllowPrivateAccess = "true"))
 	bool bHasFancyWalls = false;
@@ -202,6 +160,7 @@ private:
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStaticMesh> FallbackPlaneMesh;
 
+	// components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Grid|Components",
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<USceneComponent> SceneRoot;
@@ -234,8 +193,6 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> WestWallVisual;
 
+	// runtime values 
 	TArray<EGridCellType> Cells;
-
-
-	FRandomStream FoodRandomStream;
 };
