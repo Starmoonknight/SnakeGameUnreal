@@ -3,16 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GridDirectionTypes.generated.h"
+#include "GridSettingsTypes.generated.h"
 
 
 /**
  * 
  */
 USTRUCT(BlueprintType)
-struct FGridSettings
+struct FGridStartupSettings
 {
 	GENERATED_BODY()
+
 	UPROPERTY(EditAnywhere, Category = "Grid|Settings",
 		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	FIntPoint GridDimensions = FIntPoint(40, 40);

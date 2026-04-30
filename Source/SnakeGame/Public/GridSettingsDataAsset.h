@@ -17,5 +17,5 @@ class SNAKEGAME_API UGridSettingsDataAsset : public UDataAsset
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid")
-	FGridSettings GridSettings;
+	FGridStartupSettings GridSettings;
 };
