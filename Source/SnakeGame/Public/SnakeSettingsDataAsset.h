@@ -2,9 +2,10 @@
 
 #pragma once
 
+#include "SnakeSettingsTypes.h"
+
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include "SnakeSettingsTypes.h"
 #include "SnakeSettingsDataAsset.generated.h"
 
 /**

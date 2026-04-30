@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include  "GridDirectionTypes.generated.h"
+#include "GridDirectionTypes.generated.h"
 
 UENUM(BlueprintType)
 enum class EGridDirection : uint8

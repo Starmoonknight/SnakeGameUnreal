@@ -2,10 +2,11 @@
 
 #pragma once
 
+#include "GridSettingsTypes.h"
+
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include  "GridSettingsTypes.h"
-#include  "GridSettingsDataAsset.generated.h"
+#include "GridSettingsDataAsset.generated.h"
 
 /**
  * 

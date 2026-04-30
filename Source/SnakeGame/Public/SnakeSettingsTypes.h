@@ -2,8 +2,9 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
 #include "GridDirectionTypes.h"
+
+#include "CoreMinimal.h"
 #include  "SnakeSettingsTypes.generated.h"
 
 /**

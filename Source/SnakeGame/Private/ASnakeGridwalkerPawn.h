@@ -3,10 +3,11 @@
 //SnakeGridwalkerPawn.h
 #pragma once
 
-#include "CoreMinimal.h"
 #include "GridDirectionTypes.h"
 #include "SnakeSettingsTypes.h"
 #include "GameFramework/Pawn.h"
+
+#include "CoreMinimal.h"
 #include "InputActionValue.h"
 #include "ASnakeGridwalkerPawn.generated.h"
 
