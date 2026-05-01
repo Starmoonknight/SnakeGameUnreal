@@ -126,6 +126,13 @@ void AASnakeGridwalkerPawn::BeginPlay()
 	SetupInputMapping();
 }
 
+void AASnakeGridwalkerPawn::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	SetupInputMapping();
+}
+
 // Called every frame
 void AASnakeGridwalkerPawn::Tick(float DeltaTime)
 {

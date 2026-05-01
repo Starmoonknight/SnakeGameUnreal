@@ -2,9 +2,6 @@
 
 #pragma once
 
-#include  "SnakeSettingsTypes.h"
-#include  "GridSettingsTypes.h"
-
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "ASnakeGameModeBase.generated.h"
@@ -12,6 +9,8 @@
 class AASnakeGridwalkerPawn;
 class AAFoodActor;
 class AAGridManagerActor;
+class USnakeSettingsDataAsset;
+class UGridSettingsDataAsset; 
 class ASnakeGameState;
 
 
@@ -48,6 +47,7 @@ public:
 
 private:
 	void CacheGridManager();
+	void FindOrSpawnGridManager();
 
 	bool IsCellFreeForGameplay(const FIntPoint& Cell) const;
 	bool TryFindRandomFreeCell(FIntPoint& OutCell);
@@ -69,18 +69,32 @@ private:
 	void HandleSnakeDeath(AASnakeGridwalkerPawn* DeadSnake);
 
 
-	UPROPERTY(EditInstanceOnly, Category = "Snake|Reference",
+	// Setup
+	UPROPERTY(EditDefaultsOnly, Category = "Snake|Snakepawn",
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<AActor> SnakeSpawnPoint;
 
-	UPROPERTY(EditInstanceOnly, Category = "Snake|Reference",
+	UPROPERTY(EditDefaultsOnly, Category = "Snake|SnakePawn",
 		meta=(AllowPrivateAccess="true"))
 	TSubclassOf<AASnakeGridwalkerPawn> SnakePawnClass;
 
-	UPROPERTY(EditAnywhere, Category = "Snake|Reference",
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|SnakePawn",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USnakeSettingsDataAsset> SnakeStartupSettingsPreset;
+
+	UPROPERTY(EditAnywhere, Category = "Snake|FoodActor",
 		meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AAFoodActor> FoodActorClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Snake|Grid",
+		meta=(AllowPrivateAccess="true"))
+	TSubclassOf<AAGridManagerActor> GridManagerClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Grid",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGridSettingsDataAsset> GridStartupSettingsPreset;
+
+	// Runtime set
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<AASnakeGridwalkerPawn> SpawnedSnakePawn;
@@ -103,6 +117,7 @@ private:
 	int32 RootSeed = 12345;
 
 
+	// Runtime values 
 	int32 CurrentStageIndex = 0;
 	int32 ScoreThisStage = 0;
 

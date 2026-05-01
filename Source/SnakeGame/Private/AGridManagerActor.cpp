@@ -98,6 +98,7 @@ void AAGridManagerActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// remove soon, game manager will handle calling the InitializeCells
 	InitializeCells();
 }
 
@@ -105,6 +106,16 @@ void AAGridManagerActor::BeginPlay()
 void AAGridManagerActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+FVector AAGridManagerActor::GetSnakeSpawnPoint() const
+{
+	if (!IsValid(SnakeSpawnPoint))
+	{
+		return FVector::ZeroVector;
+	}
+
+	return SnakeSpawnPoint->GetActorLocation();
 }
 
 bool AAGridManagerActor::IsInBounds(const FIntPoint& Cell) const

@@ -89,6 +89,9 @@ public:
 	int32 GetCellSize() const { return CellSize; }
 
 	UFUNCTION(BlueprintPure, Category = "Grid")
+	FVector GetSnakeSpawnPoint() const;
+
+	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsInBounds(const FIntPoint& Cell) const;
 
 	UFUNCTION(BlueprintPure, Category = "Grid")
@@ -133,6 +136,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
 		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 CellSize = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<AActor> SnakeSpawnPoint;
 
 
 	// visuals

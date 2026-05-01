@@ -54,12 +54,71 @@ void AASnakeGameModeBase::BeginPlay()
 	FoodRandomStream.Initialize(MakeSubsystemSeed(RootSeed, FruitSeedTag));
 	DefaultRandomStream.Initialize(MakeSubsystemSeed(RootSeed, DefaultSeedTag));
 
-	CacheGridManager();
+	FindOrSpawnGridManager();
 
 	if (!GridManager)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode could not find GridManager."));
+		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode could not find or spawn GridManager."));
 		return;
+	}
+
+	StartPlayingRun();
+}
+
+void AASnakeGameModeBase::CacheGridManager()
+{
+	GridManager = Cast<AAGridManagerActor>(UGameplayStatics::GetActorOfClass(this, AAGridManagerActor::StaticClass()));
+}
+
+void AASnakeGameModeBase::FindOrSpawnGridManager()
+{
+	if (IsValid(GridManager))
+	{
+		return;
+	}
+
+	CacheGridManager();
+
+	if (IsValid(GridManager))
+	{
+		return;
+	}
+
+	if (!GridManagerClass)
+	{
+		UE_LOG(LogTemp, Warning,
+		       TEXT("SnakeGameMode could not find a placed GridManager and has no GridManagerClass assigned."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	GridManager = World->SpawnActor<AAGridManagerActor>(
+		GridManagerClass,
+		FVector::ZeroVector,
+		FRotator::ZeroRotator);
+}
+
+ASnakeGameState* AASnakeGameModeBase::GetSnakeGameState()
+{
+	return GetGameState<ASnakeGameState>();
+}
+
+// IN PROGRESS
+void AASnakeGameModeBase::StartPlayingRun()
+{
+	//BattleResult = ESnakeBattleResult::None;
+
+	ScoreThisStage = 0;
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->Score = 0;
+		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
 	}
 
 	GridManager->InitializeGridForGameplay();
@@ -68,35 +127,13 @@ void AASnakeGameModeBase::BeginPlay()
 	RespawnFruit_Temp();
 
 	StartGameLoop();
-}
-
-void AASnakeGameModeBase::CacheGridManager()
-{
-	GridManager = Cast<AAGridManagerActor>(UGameplayStatics::GetActorOfClass(this, AAGridManagerActor::StaticClass()));
-}
-
-AASnakeGameState* AASnakeGameModeBase::GetSnakeGameState()
-{
-	return GetGameState<AASnakeGameState>();
-}
-
-// IN PROGRESS
-void AASnakeGameModeBase::StartPlayingRun()
-{
-	//BattleResult = ESnakeBattleResult::None;
-
-	if (ASnakeGameState* GS = GetSnakeGameState())
-	{
-		GS->Score = 0;
-		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
-	}
 
 	//LoadStage(0);
 }
 
 void AASnakeGameModeBase::RestartRun()
 {
-	StartGameLoop();
+	StartPlayingRun();
 }
 
 
