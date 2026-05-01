@@ -1,19 +1,21 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "ASnakeGameModeBase.h"
+#include "SnakeGameModeBase.h"
 //#include "SnakeGameInstance.h"
-#include "ASnakeGameState.h"
-#include "ASnakeGridwalkerPawn.h"
-#include "AFoodActor.h"
-#include "AGridManagerActor.h"
+#include "SnakeGameState.h"
+#include "SnakeGridwalkerPawn.h"
+#include "FoodActor.h"
+#include "GridManagerActor.h"
 //#include "SnakeGameTypes.h"
-#include "ASnakeGameModeBase.h"
+#include "SnakeGameModeBase.h"
 
 #include "SnakeSettingsTypes.h"
 #include "GridSettingsTypes.h"
 
+#include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
+#include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -47,36 +49,35 @@ namespace
 }
 
 
-AASnakeGameModeBase::AASnakeGameModeBase()
+ASnakeGameModeBase::ASnakeGameModeBase()
 {
 	GameStateClass = ASnakeGameState::StaticClass();
 	DefaultPawnClass = nullptr;
 }
 
-void AASnakeGameModeBase::BeginPlay()
+void ASnakeGameModeBase::BeginPlay()
 {
 	Super::BeginPlay();
 
 	FoodRandomStream.Initialize(MakeSubsystemSeed(RootSeed, FruitSeedTag));
 	DefaultRandomStream.Initialize(MakeSubsystemSeed(RootSeed, DefaultSeedTag));
 
-	FindOrSpawnGridManager();
-
-	if (!GridManager)
+	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode could not find or spawn GridManager."));
-		return;
+		GS->SetMatchPhase(ESnakeMatchPhase::MainMenu);
 	}
 
-	StartPlayingRun();
+	ShowMainMenuWidget();
+
+	//StartPlayingRun();
 }
 
-void AASnakeGameModeBase::CacheGridManager()
+void ASnakeGameModeBase::CacheGridManager()
 {
-	GridManager = Cast<AAGridManagerActor>(UGameplayStatics::GetActorOfClass(this, AAGridManagerActor::StaticClass()));
+	GridManager = Cast<AGridManagerActor>(UGameplayStatics::GetActorOfClass(this, AGridManagerActor::StaticClass()));
 }
 
-void AASnakeGameModeBase::FindOrSpawnGridManager()
+void ASnakeGameModeBase::FindOrSpawnGridManager()
 {
 	if (IsValid(GridManager))
 	{
@@ -103,20 +104,23 @@ void AASnakeGameModeBase::FindOrSpawnGridManager()
 		return;
 	}
 
-	GridManager = World->SpawnActor<AAGridManagerActor>(
+	GridManager = World->SpawnActor<AGridManagerActor>(
 		GridManagerClass,
 		FVector::ZeroVector,
 		FRotator::ZeroRotator);
 }
 
-ASnakeGameState* AASnakeGameModeBase::GetSnakeGameState()
+ASnakeGameState* ASnakeGameModeBase::GetSnakeGameState()
 {
 	return GetGameState<ASnakeGameState>();
 }
 
 // IN PROGRESS
-void AASnakeGameModeBase::StartPlayingRun()
+void ASnakeGameModeBase::StartPlayingRun()
 {
+	HideMenuWidgets();
+	SetGameplayInputMode();
+
 	//BattleResult = ESnakeBattleResult::None;
 
 	ScoreThisStage = 0;
@@ -125,6 +129,45 @@ void AASnakeGameModeBase::StartPlayingRun()
 	{
 		GS->Score = 0;
 		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
+
+		if (GEngine)
+		{
+			// clear away the old end game message 
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(
+					2,
+					0.01f,
+					FColor::Red,
+					TEXT("")
+				);
+			}
+
+			const FString MatchPhaseName =
+				StaticEnum<ESnakeMatchPhase>()->GetNameStringByValue(
+					static_cast<int64>(GS->MatchPhase)
+				);
+
+			GEngine->AddOnScreenDebugMessage(
+				1,
+				999.0f,
+				FColor::Green,
+				FString::Printf(TEXT("Score: %d | PHASE: %s"),
+				                GS->Score,
+				                *MatchPhaseName)
+			);
+		}
+	}
+
+
+	//LoadStage(0);
+
+	FindOrSpawnGridManager();
+
+	if (!GridManager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode could not find or spawn GridManager."));
+		return;
 	}
 
 	GridManager->InitializeGridForGameplay();
@@ -133,17 +176,15 @@ void AASnakeGameModeBase::StartPlayingRun()
 	RespawnFruit_Temp();
 
 	StartGameLoop();
-
-	//LoadStage(0);
 }
 
-void AASnakeGameModeBase::RestartRun()
+void ASnakeGameModeBase::RestartRun()
 {
 	StartPlayingRun();
 }
 
 
-bool AASnakeGameModeBase::IsFoodAtCell(const FIntPoint& Cell) const
+bool ASnakeGameModeBase::IsFoodAtCell(const FIntPoint& Cell) const
 {
 	return IsValid(SpawnedFoodActor)
 		&& SpawnedFoodActor->IsActive()
@@ -151,7 +192,7 @@ bool AASnakeGameModeBase::IsFoodAtCell(const FIntPoint& Cell) const
 }
 
 
-void AASnakeGameModeBase::RespawnFruit_Temp()
+void ASnakeGameModeBase::RespawnFruit_Temp()
 {
 	FIntPoint NewFoodCell;
 
@@ -168,7 +209,7 @@ void AASnakeGameModeBase::RespawnFruit_Temp()
 }
 
 
-TArray<FIntPoint> AASnakeGameModeBase::GetAllSnakeOccupiedCells() const
+TArray<FIntPoint> ASnakeGameModeBase::GetAllSnakeOccupiedCells() const
 {
 	TArray<FIntPoint> OccupiedCells;
 
@@ -199,7 +240,7 @@ TArray<FIntPoint> AASnakeGameModeBase::GetAllSnakeOccupiedCells() const
 	*/
 }
 
-bool AASnakeGameModeBase::AnySnakeOnThisCell(const FIntPoint& Cell) const
+bool ASnakeGameModeBase::AnySnakeOnThisCell(const FIntPoint& Cell) const
 {
 	return IsValid(SpawnedSnakePawn)
 		&& SpawnedSnakePawn->IsSnakeAtCell(Cell);
@@ -223,7 +264,7 @@ bool AASnakeGameModeBase::AnySnakeOnThisCell(const FIntPoint& Cell) const
 	*/
 }
 
-bool AASnakeGameModeBase::IsCellFreeForGameplay(const FIntPoint& Cell) const
+bool ASnakeGameModeBase::IsCellFreeForGameplay(const FIntPoint& Cell) const
 {
 	if (!GridManager || !GridManager->IsInBounds(Cell))
 	{
@@ -238,7 +279,7 @@ bool AASnakeGameModeBase::IsCellFreeForGameplay(const FIntPoint& Cell) const
 	return !bBlocked;
 }
 
-bool AASnakeGameModeBase::TryFindRandomFreeCell(FIntPoint& OutCell)
+bool ASnakeGameModeBase::TryFindRandomFreeCell(FIntPoint& OutCell)
 {
 	TArray<FIntPoint> ForbiddenCells;
 
@@ -252,7 +293,7 @@ bool AASnakeGameModeBase::TryFindRandomFreeCell(FIntPoint& OutCell)
 	return TryFindRandomFreeCell_Flexible(OutCell, ForbiddenCells, DefaultRandomStream);
 }
 
-bool AASnakeGameModeBase::TryFindRandomFreeCell_Flexible(
+bool ASnakeGameModeBase::TryFindRandomFreeCell_Flexible(
 	FIntPoint& OutCell,
 	const TArray<FIntPoint>& ForbiddenCells,
 	FRandomStream& RandomStream) const
@@ -305,7 +346,7 @@ bool AASnakeGameModeBase::TryFindRandomFreeCell_Flexible(
 }
 
 
-void AASnakeGameModeBase::SpawnSnake()
+void ASnakeGameModeBase::SpawnSnake()
 {
 	if (!SnakePawnClass)
 	{
@@ -350,8 +391,8 @@ void AASnakeGameModeBase::SpawnSnake()
 	const FRotator SpawnRotator = FRotator::ZeroRotator;
 	const FTransform SpawnTransform(SpawnRotator, SpawnLocation);
 
-	AASnakeGridwalkerPawn* NewSnake =
-		World->SpawnActorDeferred<AASnakeGridwalkerPawn>(
+	ASnakeGridwalkerPawn* NewSnake =
+		World->SpawnActorDeferred<ASnakeGridwalkerPawn>(
 			SnakePawnClass,
 			SpawnTransform,
 			nullptr,
@@ -370,8 +411,8 @@ void AASnakeGameModeBase::SpawnSnake()
 	SpawnedSnakePawn = NewSnake;
 
 	// is this the safe pattern to avoid accidental double-binding
-	SpawnedSnakePawn->OnSnakeDied.RemoveDynamic(this, &AASnakeGameModeBase::HandleSnakeDeath);
-	SpawnedSnakePawn->OnSnakeDied.AddDynamic(this, &AASnakeGameModeBase::HandleSnakeDeath);
+	SpawnedSnakePawn->OnSnakeDied.RemoveDynamic(this, &ASnakeGameModeBase::HandleSnakeDeath);
+	SpawnedSnakePawn->OnSnakeDied.AddDynamic(this, &ASnakeGameModeBase::HandleSnakeDeath);
 
 	APlayerController* PlayerController = World->GetFirstPlayerController();
 	if (PlayerController)
@@ -383,7 +424,7 @@ void AASnakeGameModeBase::SpawnSnake()
 
 
 // can only be one fruit at this stage, so destroys previous if still active 
-void AASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
+void ASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
 {
 	if (!FoodActorClass)
 	{
@@ -405,7 +446,7 @@ void AASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
 
 	if (IsValid(SpawnedFoodActor))
 	{
-		SpawnedFoodActor->OnFruitConsumed.RemoveDynamic(this, &AASnakeGameModeBase::HandleFruitConsumed);
+		SpawnedFoodActor->OnFruitConsumed.RemoveDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
 
 		SpawnedFoodActor->Destroy();
 		SpawnedFoodActor = nullptr;
@@ -417,7 +458,7 @@ void AASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
 	SpawnParams.Owner = this;
 
 	// will be placed inside floor at first
-	SpawnedFoodActor = World->SpawnActor<AAFoodActor>(
+	SpawnedFoodActor = World->SpawnActor<AFoodActor>(
 		FoodActorClass,
 		SpawnLocation,
 		FRotator::ZeroRotator,
@@ -436,10 +477,104 @@ void AASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
 	SpawnedFoodActor->SetFoodValues(1, 1);
 	SpawnedFoodActor->SetActiveStatus(true);
 
-	SpawnedFoodActor->OnFruitConsumed.AddDynamic(this, &AASnakeGameModeBase::HandleFruitConsumed);
+	SpawnedFoodActor->OnFruitConsumed.AddDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
 }
 
-void AASnakeGameModeBase::StartGameLoop()
+void ASnakeGameModeBase::ShowMainMenuWidget()
+{
+	HideMenuWidgets();
+
+	if (!MainMenuWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MainMenuWidgetClass is not assigned."));
+		return;
+	}
+
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	MainMenuWidgetInstance = CreateWidget<UUserWidget>(PC, MainMenuWidgetClass);
+
+	if (MainMenuWidgetInstance)
+	{
+		MainMenuWidgetInstance->AddToViewport();
+		SetMenuInputMode();
+	}
+}
+
+void ASnakeGameModeBase::ShowOutroWidget()
+{
+	HideMenuWidgets();
+
+	if (!OutroWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("OutroWidgetClass is not assigned."));
+		return;
+	}
+
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	OutroWidgetInstance = CreateWidget<UUserWidget>(PC, OutroWidgetClass);
+
+	if (OutroWidgetInstance)
+	{
+		OutroWidgetInstance->AddToViewport();
+		SetMenuInputMode();
+	}
+}
+
+void ASnakeGameModeBase::HideMenuWidgets()
+{
+	if (MainMenuWidgetInstance)
+	{
+		MainMenuWidgetInstance->RemoveFromParent();
+		MainMenuWidgetInstance = nullptr;
+	}
+
+	if (OutroWidgetInstance)
+	{
+		OutroWidgetInstance->RemoveFromParent();
+		OutroWidgetInstance = nullptr;
+	}
+}
+
+void ASnakeGameModeBase::SetMenuInputMode()
+{
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	PC->bShowMouseCursor = true;
+
+	FInputModeUIOnly InputMode;
+	PC->SetInputMode(InputMode);
+}
+
+void ASnakeGameModeBase::SetGameplayInputMode()
+{
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	PC->bShowMouseCursor = false;
+
+	FInputModeGameOnly InputMode;
+	PC->SetInputMode(InputMode);
+}
+
+
+void ASnakeGameModeBase::StartGameLoop()
 {
 	if (!IsValid(SpawnedSnakePawn))
 	{
@@ -451,11 +586,11 @@ void AASnakeGameModeBase::StartGameLoop()
 	SpawnedSnakePawn->StartMovement();
 }
 
-void AASnakeGameModeBase::StopGameLoop()
+void ASnakeGameModeBase::StopGameLoop()
 {
 	if (!IsValid(SpawnedSnakePawn))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Cannot start game loop: no snake."));
+		UE_LOG(LogTemp, Warning, TEXT("Cannot stop game loop: no snake."));
 		return;
 	}
 
@@ -463,7 +598,7 @@ void AASnakeGameModeBase::StopGameLoop()
 }
 
 
-void AASnakeGameModeBase::HandleFruitConsumed(AAFoodActor* Food, AActor* ConsumerActor)
+void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerActor)
 {
 	// Defensive guard note:
 	// This delegate should only be bound to CurrentFood, but this prevents stale,
@@ -473,27 +608,67 @@ void AASnakeGameModeBase::HandleFruitConsumed(AAFoodActor* Food, AActor* Consume
 		return;
 	}
 
+	const int32 ScoreValue = Food->GetScoreValue();
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
-		GS->AddScore(Food->GetScoreValue());
+		GS->AddScore(ScoreValue);
+
+		// temp text 
+		if (GEngine)
+		{
+			const FString MatchPhaseName =
+				StaticEnum<ESnakeMatchPhase>()->GetNameStringByValue(
+					static_cast<int64>(GS->MatchPhase)
+				);
+
+			GEngine->AddOnScreenDebugMessage(
+				1,
+				999.0f,
+				FColor::Green,
+				FString::Printf(TEXT("Score: %d | PHASE: %s"),
+				                GS->Score,
+				                *MatchPhaseName));
+		}
 	}
 
-
-	ScoreThisStage++;
-
+	ScoreThisStage += ScoreValue;
 
 	SpawnedFoodActor = nullptr;
 	RespawnFruit_Temp();
 }
 
-void AASnakeGameModeBase::HandleSnakeDeath(AASnakeGridwalkerPawn* DeadSnake)
+void ASnakeGameModeBase::HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake)
 {
 	if (DeadSnake != SpawnedSnakePawn)
 	{
 		return;
 	}
 
-	// VERY TEMP SOLUTION! snake does not die yet, just resets its state to start version for now. 
-	RestartRun();
+	StopGameLoop();
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->SetMatchPhase(ESnakeMatchPhase::Outro);
+
+		// temp text 
+		if (GEngine)
+		{
+			const FString MatchPhaseName =
+				StaticEnum<ESnakeMatchPhase>()->GetNameStringByValue(
+					static_cast<int64>(GS->MatchPhase)
+				);
+
+			GEngine->AddOnScreenDebugMessage(
+				2,
+				999.0f,
+				FColor::Red,
+				FString::Printf(TEXT("GAME OVER - Final Score: %d | PHASE: %s"),
+				                GS->Score,
+				                *MatchPhaseName)
+			);
+		}
+	}
+
+	ShowOutroWidget();
 }

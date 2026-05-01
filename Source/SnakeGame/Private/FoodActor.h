@@ -4,9 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "AFoodActor.generated.h"
+#include "FoodActor.generated.h"
 
-class AAFoodActor; // need this since the delegate uses AAFoodActor* before the class? 
+class AFoodActor; // need this since the delegate uses AAFoodActor* before the class? 
 class USphereComponent;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
@@ -14,18 +14,18 @@ class UPrimitiveComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FFoodConsumedSignature,
-	AAFoodActor*, Food,
+	AFoodActor*, Food,
 	AActor*, ConsumerActor);
 
 
 UCLASS()
-class AAFoodActor : public AActor
+class AFoodActor : public AActor
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
-	AAFoodActor();
+	AFoodActor();
 
 protected:
 	// Called when the game starts or when spawned

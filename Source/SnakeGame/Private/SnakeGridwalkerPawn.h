@@ -9,11 +9,11 @@
 
 #include "CoreMinimal.h"
 #include "InputActionValue.h"
-#include "ASnakeGridwalkerPawn.generated.h"
+#include "SnakeGridwalkerPawn.generated.h"
 
-class AASnakeGridwalkerPawn;
+class ASnakeGridwalkerPawn;
 class USnakeSettingsDataAsset;
-class AAGridManagerActor;
+class AGridManagerActor;
 
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -46,17 +46,17 @@ class UInputAction;
 // this type describes the delegate callback signature.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FSnakeDiedSignature,
-	AASnakeGridwalkerPawn*, Snake);
+	ASnakeGridwalkerPawn*, Snake);
 
 
 UCLASS()
-class AASnakeGridwalkerPawn : public APawn
+class ASnakeGridwalkerPawn : public APawn
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this pawn's properties
-	AASnakeGridwalkerPawn();
+	ASnakeGridwalkerPawn();
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -75,7 +75,7 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Snake|Setup")
-	void ConfigureForGrid(AAGridManagerActor* InGridManager, const FIntPoint& InSpawnCell);
+	void ConfigureForGrid(AGridManagerActor* InGridManager, const FIntPoint& InSpawnCell);
 
 	// --- Events --- 
 	UPROPERTY(BlueprintAssignable, Category = "Snake|Events")
@@ -183,6 +183,7 @@ private:
 	bool TryConsumeGrowth();
 	EGridDirection DetermineDesiredDirection() const;
 	FIntPoint PeekNextHeadCell(const EGridDirection Direction) const;
+	bool CheckForCollision(const FIntPoint& NextHeadCell);
 
 	void HandleDeath();
 
@@ -241,7 +242,7 @@ private:
 
 	// Input handling
 	UPROPERTY(EditInstanceOnly, Category = "Snake|References", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<AAGridManagerActor> GridManager;
+	TObjectPtr<AGridManagerActor> GridManager;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
 		meta = (AllowPrivateAccess = "true"))

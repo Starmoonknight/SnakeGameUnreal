@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "AGridManagerActor.generated.h"
+#include "GridManagerActor.generated.h"
 
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -56,13 +56,13 @@ enum class EGridCellType : uint8
 
 
 UCLASS()
-class AAGridManagerActor : public AActor
+class AGridManagerActor : public AActor
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
-	AAGridManagerActor();
+	AGridManagerActor();
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;

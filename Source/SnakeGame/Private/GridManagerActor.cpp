@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "AGridManagerActor.h"
+#include "GridManagerActor.h"
 
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -52,7 +52,7 @@ namespace
 
 
 // Sets default values
-AAGridManagerActor::AAGridManagerActor()
+AGridManagerActor::AGridManagerActor()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
@@ -86,7 +86,7 @@ AAGridManagerActor::AAGridManagerActor()
 	WestWallVisual->SetSimulatePhysics(false);
 }
 
-void AAGridManagerActor::OnConstruction(const FTransform& Transform)
+void AGridManagerActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
@@ -94,7 +94,7 @@ void AAGridManagerActor::OnConstruction(const FTransform& Transform)
 }
 
 // Called when the game starts or when spawned
-void AAGridManagerActor::BeginPlay()
+void AGridManagerActor::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -103,12 +103,12 @@ void AAGridManagerActor::BeginPlay()
 }
 
 // Called every frame
-void AAGridManagerActor::Tick(float DeltaTime)
+void AGridManagerActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
 
-FIntPoint AAGridManagerActor::GetSnakeSpawnWorldLocation() const
+FIntPoint AGridManagerActor::GetSnakeSpawnWorldLocation() const
 {
 	if (!IsValid(SnakeSpawnPoint))
 	{
@@ -118,13 +118,13 @@ FIntPoint AAGridManagerActor::GetSnakeSpawnWorldLocation() const
 	return WorldToGrid(SnakeSpawnPoint->GetActorLocation());
 }
 
-bool AAGridManagerActor::IsInBounds(const FIntPoint& Cell) const
+bool AGridManagerActor::IsInBounds(const FIntPoint& Cell) const
 {
 	return (Cell.X >= 0 && Cell.X < GridDimensions.X)
 		&& (Cell.Y >= 0 && Cell.Y < GridDimensions.Y);
 }
 
-FVector AAGridManagerActor::GridToWorld(const FIntPoint& Cell) const
+FVector AGridManagerActor::GridToWorld(const FIntPoint& Cell) const
 {
 	return FVector(
 		GridOrigin.X + (Cell.X * CellSize),
@@ -132,7 +132,7 @@ FVector AAGridManagerActor::GridToWorld(const FIntPoint& Cell) const
 		GridWorldZ);
 }
 
-FIntPoint AAGridManagerActor::WorldToGrid(const FVector& WorldLocation) const
+FIntPoint AGridManagerActor::WorldToGrid(const FVector& WorldLocation) const
 {
 	const float LocalX = (WorldLocation.X - GridOrigin.X) / CellSize;
 	const float LocalY = (WorldLocation.Y - GridOrigin.Y) / CellSize;
@@ -143,7 +143,7 @@ FIntPoint AAGridManagerActor::WorldToGrid(const FVector& WorldLocation) const
 		FMath::RoundToInt(LocalY));
 }
 
-bool AAGridManagerActor::IsCellBlockedByBoard(const FIntPoint& Cell) const
+bool AGridManagerActor::IsCellBlockedByBoard(const FIntPoint& Cell) const
 {
 	if (!IsInBounds(Cell))
 	{
@@ -153,7 +153,7 @@ bool AAGridManagerActor::IsCellBlockedByBoard(const FIntPoint& Cell) const
 	return Cells[FlatIndex(Cell)] == EGridCellType::Blocked;
 }
 
-void AAGridManagerActor::InitializeGridForGameplay()
+void AGridManagerActor::InitializeGridForGameplay()
 {
 	InitializeCells();
 }
@@ -175,7 +175,7 @@ Index < GridDimensions.X * GridDimensions.Y
 */
 
 
-int32 AAGridManagerActor::FlatIndex(const FIntPoint& Cell) const
+int32 AGridManagerActor::FlatIndex(const FIntPoint& Cell) const
 {
 	check(GridDimensions.X > 0);
 	check(IsInBounds(Cell));
@@ -183,7 +183,7 @@ int32 AAGridManagerActor::FlatIndex(const FIntPoint& Cell) const
 	return Cell.Y * GridDimensions.X + Cell.X;
 }
 
-FIntPoint AAGridManagerActor::IndexToCellCoord(const int32 Index) const
+FIntPoint AGridManagerActor::IndexToCellCoord(const int32 Index) const
 {
 	check(GridDimensions.X > 0);
 	check(GridDimensions.Y > 0);
@@ -196,7 +196,7 @@ FIntPoint AAGridManagerActor::IndexToCellCoord(const int32 Index) const
 	return FIntPoint(X, Y);
 }
 
-UStaticMesh* AAGridManagerActor::GetWallMeshToUse() const
+UStaticMesh* AGridManagerActor::GetWallMeshToUse() const
 {
 	if (bHasFancyWalls && WallMeshAsset)
 	{
@@ -206,7 +206,7 @@ UStaticMesh* AAGridManagerActor::GetWallMeshToUse() const
 	return FallbackCubeMesh;
 }
 
-UStaticMesh* AAGridManagerActor::GetFloorMeshToUse() const
+UStaticMesh* AGridManagerActor::GetFloorMeshToUse() const
 {
 	if (bHasFancyFloor && FloorMeshAsset)
 	{
@@ -217,7 +217,7 @@ UStaticMesh* AAGridManagerActor::GetFloorMeshToUse() const
 }
 
 
-void AAGridManagerActor::InitializeCells()
+void AGridManagerActor::InitializeCells()
 {
 	const int32 CellCount = GridDimensions.X * GridDimensions.Y;
 	Cells.SetNum(CellCount);
@@ -228,12 +228,12 @@ void AAGridManagerActor::InitializeCells()
 	}
 }
 
-void AAGridManagerActor::BuildTiledFloor()
+void AGridManagerActor::BuildTiledFloor()
 {
 	// way to make checkered material look here. 
 }
 
-void AAGridManagerActor::SetupGridVisuals_Stretchy()
+void AGridManagerActor::SetupGridVisuals_Stretchy()
 {
 	// gather derived values 
 	const FBoardBuildData GridData = BuildBoardData(

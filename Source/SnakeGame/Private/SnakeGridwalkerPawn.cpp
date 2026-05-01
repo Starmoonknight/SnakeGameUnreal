@@ -1,10 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 //SnakeGridwalkerPawn.cpp
-#include "ASnakeGridwalkerPawn.h"
+#include "SnakeGridwalkerPawn.h"
 #include "SnakeSettingsDataAsset.h"
+#include "SnakeGameModeBase.h"
 
-#include "AGridManagerActor.h"
+#include "GridManagerActor.h"
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
 #include "Components/SphereComponent.h"
@@ -16,6 +17,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "SnakeGameModeBase.h"
 #include "Kismet/GameplayStatics.h"
 
 //#include "Kismet/KismetMathLibrary.h"
@@ -66,7 +68,7 @@ namespace
 
 
 // Sets default values
-AASnakeGridwalkerPawn::AASnakeGridwalkerPawn()
+ASnakeGridwalkerPawn::ASnakeGridwalkerPawn()
 {
 	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -109,7 +111,7 @@ AASnakeGridwalkerPawn::AASnakeGridwalkerPawn()
 	bUseControllerRotationYaw = false; // new
 }
 
-void AASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
+void ASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
@@ -117,7 +119,7 @@ void AASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
 }
 
 // Called when the game starts or when spawned
-void AASnakeGridwalkerPawn::BeginPlay()
+void ASnakeGridwalkerPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -126,7 +128,7 @@ void AASnakeGridwalkerPawn::BeginPlay()
 	SetupInputMapping();
 }
 
-void AASnakeGridwalkerPawn::PossessedBy(AController* NewController)
+void ASnakeGridwalkerPawn::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 
@@ -134,7 +136,7 @@ void AASnakeGridwalkerPawn::PossessedBy(AController* NewController)
 }
 
 // Called every frame
-void AASnakeGridwalkerPawn::Tick(float DeltaTime)
+void ASnakeGridwalkerPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
@@ -161,7 +163,7 @@ void AASnakeGridwalkerPawn::Tick(float DeltaTime)
 }
 
 // Called to bind functionality to input
-void AASnakeGridwalkerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void ASnakeGridwalkerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
@@ -171,35 +173,35 @@ void AASnakeGridwalkerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInp
 		if (MoveAction)
 		{
 			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this,
-			                          &AASnakeGridwalkerPawn::Input_OnMove);
+			                          &ASnakeGridwalkerPawn::Input_OnMove);
 			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Completed, this,
-			                          &AASnakeGridwalkerPawn::Input_OnMove);
+			                          &ASnakeGridwalkerPawn::Input_OnMove);
 			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Canceled, this,
-			                          &AASnakeGridwalkerPawn::Input_OnMove);
+			                          &ASnakeGridwalkerPawn::Input_OnMove);
 		}
 
 		if (TestGrowthAction)
 		{
 			EnhancedInput->BindAction(TestGrowthAction, ETriggerEvent::Started, this,
-			                          &AASnakeGridwalkerPawn::Input_OnGrowPressed);
+			                          &ASnakeGridwalkerPawn::Input_OnGrowPressed);
 		}
 
 		if (TestResetAction)
 		{
 			EnhancedInput->BindAction(TestResetAction, ETriggerEvent::Started, this,
-			                          &AASnakeGridwalkerPawn::Input_OnResetPressed);
+			                          &ASnakeGridwalkerPawn::Input_OnResetPressed);
 		}
 	}
 }
 
-void AASnakeGridwalkerPawn::ConfigureForGrid(AAGridManagerActor* InGridManager, const FIntPoint& InSpawnCell)
+void ASnakeGridwalkerPawn::ConfigureForGrid(AGridManagerActor* InGridManager, const FIntPoint& InSpawnCell)
 {
 	GridManager = InGridManager;
 	SpawnCell = InSpawnCell;
 	GridCellHeadPosition = InSpawnCell;
 }
 
-bool AASnakeGridwalkerPawn::TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const
+bool ASnakeGridwalkerPawn::TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const
 {
 	if (!BodyCells.IsValidIndex(SegmentIndex))
 	{
@@ -210,14 +212,14 @@ bool AASnakeGridwalkerPawn::TryGetBodyCellPositionByIndex(int32 SegmentIndex, FI
 	return true;
 }
 
-bool AASnakeGridwalkerPawn::TryFindBodyIndexAtCell(const FIntPoint& Cell, int32& OutSegmentIndex) const
+bool ASnakeGridwalkerPawn::TryFindBodyIndexAtCell(const FIntPoint& Cell, int32& OutSegmentIndex) const
 {
 	// .IndexOfByKey returns first match, fine for snake where each body cell should be unique 
 	OutSegmentIndex = BodyCells.IndexOfByKey(Cell);
 	return OutSegmentIndex != INDEX_NONE;
 }
 
-void AASnakeGridwalkerPawn::StartMovement()
+void ASnakeGridwalkerPawn::StartMovement()
 {
 	if (!bIsAlive)
 	{
@@ -229,19 +231,19 @@ void AASnakeGridwalkerPawn::StartMovement()
 	StepAccumulator = 0.0f;
 }
 
-void AASnakeGridwalkerPawn::StopMovement()
+void ASnakeGridwalkerPawn::StopMovement()
 {
 	bMovementActive = false;
-	bMovementPaused = false;
+	//bMovementPaused = false;
 	StepAccumulator = 0.0f;
 }
 
-void AASnakeGridwalkerPawn::SetMovementPaused(bool bPaused)
+void ASnakeGridwalkerPawn::SetMovementPaused(bool bPaused)
 {
 	bMovementPaused = bPaused;
 }
 
-void AASnakeGridwalkerPawn::ResetSnake()
+void ASnakeGridwalkerPawn::ResetSnake()
 {
 	if (!GridManager)
 	{
@@ -282,7 +284,7 @@ void AASnakeGridwalkerPawn::ResetSnake()
 	}
 }
 
-void AASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
+void ASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 {
 	if (Amount <= 0)
 	{
@@ -292,7 +294,7 @@ void AASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 	PendingGrowth += Amount;
 }
 
-void AASnakeGridwalkerPawn::ApplyVisualAssets()
+void ASnakeGridwalkerPawn::ApplyVisualAssets()
 {
 	if (SnakeHeadMesh && HeadMeshAsset)
 	{
@@ -313,7 +315,7 @@ void AASnakeGridwalkerPawn::ApplyVisualAssets()
 	}
 }
 
-void AASnakeGridwalkerPawn::SetupInputMapping()
+void ASnakeGridwalkerPawn::SetupInputMapping()
 {
 	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 	{
@@ -331,7 +333,7 @@ void AASnakeGridwalkerPawn::SetupInputMapping()
 	}
 }
 
-void AASnakeGridwalkerPawn::ApplyStartupSettings(const FSnakeStartupSettings& Settings)
+void ASnakeGridwalkerPawn::ApplyStartupSettings(const FSnakeStartupSettings& Settings)
 {
 	StepInterval = FMath::Max(Settings.StepInterval, 0.01f);
 	TurnDuration = FMath::Max(Settings.TurnDuration, 0.01f);
@@ -342,7 +344,7 @@ void AASnakeGridwalkerPawn::ApplyStartupSettings(const FSnakeStartupSettings& Se
 	PendingGrowth = Settings.InitialPendingGrowth;
 }
 
-const FSnakeStartupSettings& AASnakeGridwalkerPawn::GetResolvedStartupSettings() const
+const FSnakeStartupSettings& ASnakeGridwalkerPawn::GetResolvedStartupSettings() const
 {
 	return StartupSettingsPreset
 		       ? StartupSettingsPreset->StartupSettings
@@ -350,7 +352,7 @@ const FSnakeStartupSettings& AASnakeGridwalkerPawn::GetResolvedStartupSettings()
 }
 
 
-FTransform AASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const
+FTransform ASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint& BodyCell) const
 {
 	if (!GridManager)
 	{
@@ -367,7 +369,7 @@ FTransform AASnakeGridwalkerPawn::MakeBodyInstanceLocalTransform(const FIntPoint
 	return FTransform(FRotator::ZeroRotator, LocalLocation, FVector::OneVector);
 }
 
-EGridDirection AASnakeGridwalkerPawn::ResolveDirectionFromInput(const FVector2D& Input)
+EGridDirection ASnakeGridwalkerPawn::ResolveDirectionFromInput(const FVector2D& Input)
 {
 	// no input early out
 	if (Input.IsNearlyZero())
@@ -389,7 +391,7 @@ EGridDirection AASnakeGridwalkerPawn::ResolveDirectionFromInput(const FVector2D&
 	return EGridDirection::None;
 }
 
-void AASnakeGridwalkerPawn::Input_OnMove(const FInputActionValue& Value)
+void ASnakeGridwalkerPawn::Input_OnMove(const FInputActionValue& Value)
 {
 	RawMoveInput = Value.Get<FVector2D>();
 
@@ -401,18 +403,24 @@ void AASnakeGridwalkerPawn::Input_OnMove(const FInputActionValue& Value)
 	}
 }
 
-void AASnakeGridwalkerPawn::Input_OnGrowPressed()
+void ASnakeGridwalkerPawn::Input_OnGrowPressed()
 {
 	RequestGrowth();
 }
 
-void AASnakeGridwalkerPawn::Input_OnResetPressed()
+void ASnakeGridwalkerPawn::Input_OnResetPressed()
 {
-	ResetSnake();
-	StartMovement();
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		if (ASnakeGameModeBase* SnakeGameMode = World->GetAuthGameMode<ASnakeGameModeBase>())
+		{
+			SnakeGameMode->RestartRun();
+		}
+	}
 }
 
-float AASnakeGridwalkerPawn::GetHeadPlacementHalfHeight() const
+float ASnakeGridwalkerPawn::GetHeadPlacementHalfHeight() const
 {
 	if (!CollisionSphere)
 	{
@@ -422,12 +430,12 @@ float AASnakeGridwalkerPawn::GetHeadPlacementHalfHeight() const
 	return CollisionSphere->GetScaledSphereRadius();
 }
 
-float AASnakeGridwalkerPawn::GetBodyPlacementHalfHeight() const
+float ASnakeGridwalkerPawn::GetBodyPlacementHalfHeight() const
 {
 	return GetHeadPlacementHalfHeight(); // Temp since the segments are still only visuals
 }
 
-FVector AASnakeGridwalkerPawn::GetHeadWorldLocationForCell(const FIntPoint& Cell) const
+FVector ASnakeGridwalkerPawn::GetHeadWorldLocationForCell(const FIntPoint& Cell) const
 {
 	if (!GridManager)
 	{
@@ -439,12 +447,12 @@ FVector AASnakeGridwalkerPawn::GetHeadWorldLocationForCell(const FIntPoint& Cell
 	return GridLocation;
 }
 
-FVector AASnakeGridwalkerPawn::GetBodyWorldLocationForCell(const FIntPoint& Cell) const
+FVector ASnakeGridwalkerPawn::GetBodyWorldLocationForCell(const FIntPoint& Cell) const
 {
 	return GetHeadWorldLocationForCell(Cell); // Temp since the segments are still only visuals
 }
 
-void AASnakeGridwalkerPawn::StartHeadTurnVisual(EGridDirection NewDirection)
+void ASnakeGridwalkerPawn::StartHeadTurnVisual(EGridDirection NewDirection)
 {
 	TurnTargetYaw = DirectionToYaw(NewDirection);
 	TurnStartYaw = SnakeHeadMesh->GetRelativeRotation().Yaw;
@@ -453,7 +461,7 @@ void AASnakeGridwalkerPawn::StartHeadTurnVisual(EGridDirection NewDirection)
 	IsTurning = true;
 }
 
-void AASnakeGridwalkerPawn::UpdateHeadTurnVisual(float DeltaTime)
+void ASnakeGridwalkerPawn::UpdateHeadTurnVisual(float DeltaTime)
 {
 	if (!IsTurning)
 	{
@@ -486,7 +494,7 @@ void AASnakeGridwalkerPawn::UpdateHeadTurnVisual(float DeltaTime)
 	//UKismetMathLibrary::RInterpTo();
 }
 
-void AASnakeGridwalkerPawn::AddBodyVisualSegment(const FIntPoint& BodyCell)
+void ASnakeGridwalkerPawn::AddBodyVisualSegment(const FIntPoint& BodyCell)
 {
 	if (!VisualSegmentMesh)
 	{
@@ -496,7 +504,7 @@ void AASnakeGridwalkerPawn::AddBodyVisualSegment(const FIntPoint& BodyCell)
 	VisualSegmentMesh->AddInstance(MakeBodyInstanceLocalTransform(BodyCell));
 }
 
-void AASnakeGridwalkerPawn::UpdateBodyVisualTransforms()
+void ASnakeGridwalkerPawn::UpdateBodyVisualTransforms()
 {
 	if (!VisualSegmentMesh)
 	{
@@ -521,7 +529,7 @@ void AASnakeGridwalkerPawn::UpdateBodyVisualTransforms()
 	}
 }
 
-void AASnakeGridwalkerPawn::SyncBodyVisuals()
+void ASnakeGridwalkerPawn::SyncBodyVisuals()
 {
 	if (!VisualSegmentMesh)
 	{
@@ -547,7 +555,7 @@ void AASnakeGridwalkerPawn::SyncBodyVisuals()
 }
 
 
-bool AASnakeGridwalkerPawn::TryConsumeGrowth()
+bool ASnakeGridwalkerPawn::TryConsumeGrowth()
 {
 	if (PendingGrowth <= 0)
 	{
@@ -558,7 +566,7 @@ bool AASnakeGridwalkerPawn::TryConsumeGrowth()
 	return true;
 }
 
-EGridDirection AASnakeGridwalkerPawn::DetermineDesiredDirection() const
+EGridDirection ASnakeGridwalkerPawn::DetermineDesiredDirection() const
 {
 	// Choose which direction this step should try to use.
 	if (PendingNextDirection != EGridDirection::None &&
@@ -570,12 +578,39 @@ EGridDirection AASnakeGridwalkerPawn::DetermineDesiredDirection() const
 	return CurrentDirection;
 }
 
-FIntPoint AASnakeGridwalkerPawn::PeekNextHeadCell(const EGridDirection Direction) const
+FIntPoint ASnakeGridwalkerPawn::PeekNextHeadCell(const EGridDirection Direction) const
 {
 	return GridCellHeadPosition + GridDelta(Direction);
 }
 
-void AASnakeGridwalkerPawn::HandleDeath()
+
+bool ASnakeGridwalkerPawn::CheckForCollision(const FIntPoint& NextHeadCell)
+{
+	// check for grid obstacle / out of bounds
+	if (GridManager->IsCellBlockedByBoard(NextHeadCell))
+	{
+		HandleDeath();
+		return true;
+	}
+
+	// can only enter tail cell if it is going to be free by next step,
+	// if there is no planned growth, then the absolute last tail segment will not be here after movement has been applied
+	const bool bCanMoveIntoCurrentTailspace =
+		BodyCells.Num() > 0 &&
+		NextHeadCell == BodyCells.Last() &&
+		PendingGrowth <= 0;
+
+	// check for self collision
+	if (BodyCells.Contains(NextHeadCell) && !bCanMoveIntoCurrentTailspace)
+	{
+		HandleDeath();
+		return true;
+	}
+
+	return false;
+}
+
+void ASnakeGridwalkerPawn::HandleDeath()
 {
 	if (!bIsAlive)
 	{
@@ -587,7 +622,7 @@ void AASnakeGridwalkerPawn::HandleDeath()
 	OnSnakeDied.Broadcast(this);
 }
 
-void AASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
+void ASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell)
 {
 	if (!GridManager)
 	{
@@ -599,7 +634,7 @@ void AASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCel
 	SetActorLocation(GetHeadWorldLocationForCell(NextHeadCell));
 }
 
-void AASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
+void ASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
 {
 	if (BodyCells.IsEmpty())
 	{
@@ -614,7 +649,7 @@ void AASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
 	}
 }
 
-void AASnakeGridwalkerPawn::AdvanceSnakeOneStep()
+void ASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 {
 	if (!GridManager)
 	{
@@ -637,12 +672,8 @@ void AASnakeGridwalkerPawn::AdvanceSnakeOneStep()
 	// consume input after registering it 
 	PendingNextDirection = EGridDirection::None;
 
-	// later:
-	// if (!CanEnterCell(NextHeadCell)) { handle death/block; return; }
-	// MVP board bounds check
-	if (!GridManager->IsInBounds(NextHeadCell))
+	if (CheckForCollision(NextHeadCell))
 	{
-		HandleDeath();
 		return;
 	}
 

@@ -1,14 +1,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "AFoodActor.h"
-#include "ASnakeGridwalkerPawn.h"
+#include "FoodActor.h"
+#include "SnakeGridwalkerPawn.h"
 
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 
 // Sets default values
-AAFoodActor::AAFoodActor()
+AFoodActor::AFoodActor()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
@@ -30,20 +30,20 @@ AAFoodActor::AAFoodActor()
 
 
 // Called when the game starts or when spawned
-void AAFoodActor::BeginPlay()
+void AFoodActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	CollisionSphere->OnComponentBeginOverlap.AddDynamic(this, &AAFoodActor::HandleFoodOverlap);
+	CollisionSphere->OnComponentBeginOverlap.AddDynamic(this, &AFoodActor::HandleFoodOverlap);
 }
 
 // Called every frame
-void AAFoodActor::Tick(float DeltaTime)
+void AFoodActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
 
-float AAFoodActor::GetPlacementHalfHeight() const
+float AFoodActor::GetPlacementHalfHeight() const
 {
 	if (!CollisionSphere)
 	{
@@ -53,19 +53,19 @@ float AAFoodActor::GetPlacementHalfHeight() const
 	return CollisionSphere->GetScaledSphereRadius();
 }
 
-void AAFoodActor::SetFoodGridPosition(const FIntPoint& NewGridPosition, const FVector& NewWorldLocation)
+void AFoodActor::SetFoodGridPosition(const FIntPoint& NewGridPosition, const FVector& NewWorldLocation)
 {
 	FoodGridPosition = NewGridPosition;
 	SetActorLocation(NewWorldLocation);
 }
 
-void AAFoodActor::SetFoodValues(const int32 NewScoreValue, const int32 NewGrowthValue)
+void AFoodActor::SetFoodValues(const int32 NewScoreValue, const int32 NewGrowthValue)
 {
 	ScoreValue = FMath::Max(0, NewScoreValue);
 	GrowthValue = FMath::Max(0, NewGrowthValue);
 }
 
-void AAFoodActor::SetActiveStatus(bool bShouldBeActive, bool bShouldBroadcastChange)
+void AFoodActor::SetActiveStatus(bool bShouldBeActive, bool bShouldBroadcastChange)
 {
 	if (bIsActive == bShouldBeActive)
 	{
@@ -81,9 +81,9 @@ void AAFoodActor::SetActiveStatus(bool bShouldBeActive, bool bShouldBroadcastCha
 	// }
 }
 
-void AAFoodActor::HandleFoodOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
-                                    const FHitResult& SweepResult)
+void AFoodActor::HandleFoodOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+                                   UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
+                                   const FHitResult& SweepResult)
 {
 	//if (!bFromSweep)  // snake currently teleports, not by swept movement 
 	if (!bIsActive)
@@ -91,7 +91,7 @@ void AAFoodActor::HandleFoodOverlap(UPrimitiveComponent* OverlappedComponent, AA
 		return;
 	}
 
-	AASnakeGridwalkerPawn* SnakePawn = Cast<AASnakeGridwalkerPawn>(OtherActor);
+	ASnakeGridwalkerPawn* SnakePawn = Cast<ASnakeGridwalkerPawn>(OtherActor);
 	if (!SnakePawn)
 	{
 		return;
@@ -101,7 +101,7 @@ void AAFoodActor::HandleFoodOverlap(UPrimitiveComponent* OverlappedComponent, AA
 	ConsumeBy(SnakePawn);
 }
 
-void AAFoodActor::ConsumeBy(AActor* ConsumerActor)
+void AFoodActor::ConsumeBy(AActor* ConsumerActor)
 {
 	if (!bIsActive)
 	{
@@ -113,7 +113,7 @@ void AAFoodActor::ConsumeBy(AActor* ConsumerActor)
 	Destroy(); // pooling does not exist yet, maybe later make DestroyFood() to handle end of life. 
 }
 
-void AAFoodActor::InactivateFood()
+void AFoodActor::InactivateFood()
 {
 	bIsActive = false;
 
@@ -121,7 +121,7 @@ void AAFoodActor::InactivateFood()
 	CollisionSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-void AAFoodActor::ActivateFood()
+void AFoodActor::ActivateFood()
 {
 	bIsActive = true;
 

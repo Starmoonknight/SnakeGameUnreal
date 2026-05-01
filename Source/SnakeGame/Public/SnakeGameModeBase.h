@@ -4,48 +4,66 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include "ASnakeGameModeBase.generated.h"
+#include "SnakeGameModeBase.generated.h"
 
-class AASnakeGridwalkerPawn;
-class AAFoodActor;
-class AAGridManagerActor;
+class ASnakeGridwalkerPawn;
+class AFoodActor;
+class AGridManagerActor;
 class USnakeSettingsDataAsset;
 class UGridSettingsDataAsset;
 class ASnakeGameState;
+
+class UUserWidget;
 
 
 /**
  *
  */
 UCLASS()
-class AASnakeGameModeBase : public AGameModeBase
+class ASnakeGameModeBase : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	AASnakeGameModeBase();
+	ASnakeGameModeBase();
 
 	virtual void BeginPlay() override;
 
 
 	// --- Information getters ---
 
-	UFUNCTION(BlueprintPure, Category = "Grid|Food")
+	UFUNCTION(BlueprintPure)
 	bool IsFoodAtCell(const FIntPoint& Cell) const;
 
+	UFUNCTION(BlueprintPure)
 	TArray<FIntPoint> GetAllSnakeOccupiedCells() const;
+
+	UFUNCTION(BlueprintPure)
 	bool AnySnakeOnThisCell(const FIntPoint& Cell) const;
 
 	// --- Logic setters --- 
 
-	UFUNCTION(BlueprintCallable, Category = "Snake")
+	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void StartPlayingRun();
 
-	UFUNCTION(BlueprintCallable, Category = "Snake")
+	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void RestartRun();
 
-	UFUNCTION(BlueprintCallable, Category = "Grid|Food")
+	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void RespawnFruit_Temp();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|UI")
+	TSubclassOf<UUserWidget> MainMenuWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|UI")
+	TSubclassOf<UUserWidget> OutroWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> MainMenuWidgetInstance;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> OutroWidgetInstance;
 
 private:
 	void CacheGridManager();
@@ -59,22 +77,30 @@ private:
 	void SpawnSnake();
 	void SpawnFruit_Destructive(const FIntPoint& Cell);
 
+	// UI 
+	void ShowMainMenuWidget();
+	void ShowOutroWidget();
+	void HideMenuWidgets();
+
+	void SetMenuInputMode();
+	void SetGameplayInputMode();
+
 	// Game 
 	void StartGameLoop();
 	void StopGameLoop();
 	//void PauseGameLoop();
 
 	UFUNCTION()
-	void HandleFruitConsumed(AAFoodActor* Food, AActor* ConsumerActor);
+	void HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerActor);
 
 	UFUNCTION()
-	void HandleSnakeDeath(AASnakeGridwalkerPawn* DeadSnake);
+	void HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake);
 
 
 	// Setup
 	UPROPERTY(EditDefaultsOnly, Category = "Snake|SnakePawn",
 		meta=(AllowPrivateAccess="true"))
-	TSubclassOf<AASnakeGridwalkerPawn> SnakePawnClass;
+	TSubclassOf<ASnakeGridwalkerPawn> SnakePawnClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|SnakePawn",
 		meta = (AllowPrivateAccess = "true"))
@@ -82,11 +108,11 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Snake|FoodActor",
 		meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<AAFoodActor> FoodActorClass;
+	TSubclassOf<AFoodActor> FoodActorClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Snake|Grid",
 		meta=(AllowPrivateAccess="true"))
-	TSubclassOf<AAGridManagerActor> GridManagerClass;
+	TSubclassOf<AGridManagerActor> GridManagerClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Grid",
 		meta = (AllowPrivateAccess = "true"))
@@ -99,19 +125,19 @@ private:
 	// Runtime set
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
 		meta=(AllowPrivateAccess="true"))
-	TObjectPtr<AASnakeGridwalkerPawn> SpawnedSnakePawn;
+	TObjectPtr<ASnakeGridwalkerPawn> SpawnedSnakePawn;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
 		meta = (AllowPrivateAccess="true"))
-	TArray<TObjectPtr<AASnakeGridwalkerPawn>> SpawnedSnakes;
+	TArray<TObjectPtr<ASnakeGridwalkerPawn>> SpawnedSnakes;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
 		meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AAFoodActor> SpawnedFoodActor;
+	TObjectPtr<AFoodActor> SpawnedFoodActor;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
 		meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AAGridManagerActor> GridManager;
+	TObjectPtr<AGridManagerActor> GridManager;
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",

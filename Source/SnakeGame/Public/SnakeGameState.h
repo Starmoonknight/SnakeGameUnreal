@@ -5,7 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
-#include "ASnakeGameState.generated.h"
+#include "SnakeGameState.generated.h"
 
 UENUM(BlueprintType)
 enum class ESnakeMatchPhase : uint8
