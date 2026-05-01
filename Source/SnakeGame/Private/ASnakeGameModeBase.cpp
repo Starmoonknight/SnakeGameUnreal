@@ -47,6 +47,12 @@ namespace
 }
 
 
+AASnakeGameModeBase::AASnakeGameModeBase()
+{
+	GameStateClass = ASnakeGameState::StaticClass();
+	DefaultPawnClass = nullptr;
+}
+
 void AASnakeGameModeBase::BeginPlay()
 {
 	Super::BeginPlay();
@@ -325,11 +331,13 @@ void AASnakeGameModeBase::SpawnSnake()
 		SpawnedSnakePawn = nullptr;
 	}
 
-	FIntPoint SnakeSpawnCell(GridManager->GetWidth() / 2, GridManager->GetHeight() / 2);
-	if (SnakeSpawnPoint)
-	{
-		SnakeSpawnCell = GridManager->WorldToCell(SnakeSpawnPoint->GetActorLocation());
-	}
+	// FIntPoint SnakeSpawnCell(GridManager->GetWidth() / 2, GridManager->GetHeight() / 2);
+	// if (SnakeSpawnPoint)
+	// {
+	// 	SnakeSpawnCell = GridManager->WorldToGrid(SnakeSpawnPoint->GetActorLocation());
+	// }
+	SnakeSpawnCell = GridManager->GetSnakeSpawnCell();
+
 
 	// need to align to propper cell placement first
 	if (!GridManager->IsInBounds(SnakeSpawnCell))
@@ -338,7 +346,7 @@ void AASnakeGameModeBase::SpawnSnake()
 		SnakeSpawnCell = FIntPoint::ZeroValue;
 	}
 
-	const FVector SpawnLocation = GridManager->CellToWorld(SnakeSpawnCell);
+	const FVector SpawnLocation = GridManager->GridToWorld(SnakeSpawnCell);
 	const FRotator SpawnRotator = FRotator::ZeroRotator;
 	const FTransform SpawnTransform(SpawnRotator, SpawnLocation);
 
@@ -403,7 +411,7 @@ void AASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
 		SpawnedFoodActor = nullptr;
 	}
 
-	FVector SpawnLocation = GridManager->CellToWorld(Cell);
+	FVector SpawnLocation = GridManager->GridToWorld(Cell);
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;

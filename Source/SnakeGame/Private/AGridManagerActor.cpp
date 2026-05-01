@@ -108,14 +108,14 @@ void AAGridManagerActor::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-FVector AAGridManagerActor::GetSnakeSpawnPoint() const
+FIntPoint AAGridManagerActor::GetSnakeSpawnWorldLocation() const
 {
 	if (!IsValid(SnakeSpawnPoint))
 	{
-		return FVector::ZeroVector;
+		return FIntPoint::ZeroValue;
 	}
 
-	return SnakeSpawnPoint->GetActorLocation();
+	return WorldToGrid(SnakeSpawnPoint->GetActorLocation());
 }
 
 bool AAGridManagerActor::IsInBounds(const FIntPoint& Cell) const
@@ -124,7 +124,7 @@ bool AAGridManagerActor::IsInBounds(const FIntPoint& Cell) const
 		&& (Cell.Y >= 0 && Cell.Y < GridDimensions.Y);
 }
 
-FVector AAGridManagerActor::CellToWorld(const FIntPoint& Cell) const
+FVector AAGridManagerActor::GridToWorld(const FIntPoint& Cell) const
 {
 	return FVector(
 		GridOrigin.X + (Cell.X * CellSize),
@@ -132,7 +132,7 @@ FVector AAGridManagerActor::CellToWorld(const FIntPoint& Cell) const
 		GridWorldZ);
 }
 
-FIntPoint AAGridManagerActor::WorldToCell(const FVector& WorldLocation) const
+FIntPoint AAGridManagerActor::WorldToGrid(const FVector& WorldLocation) const
 {
 	const float LocalX = (WorldLocation.X - GridOrigin.X) / CellSize;
 	const float LocalY = (WorldLocation.Y - GridOrigin.Y) / CellSize;

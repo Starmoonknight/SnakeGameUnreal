@@ -10,7 +10,7 @@ class AASnakeGridwalkerPawn;
 class AAFoodActor;
 class AAGridManagerActor;
 class USnakeSettingsDataAsset;
-class UGridSettingsDataAsset; 
+class UGridSettingsDataAsset;
 class ASnakeGameState;
 
 
@@ -23,6 +23,8 @@ class AASnakeGameModeBase : public AGameModeBase
 	GENERATED_BODY()
 
 public:
+	AASnakeGameModeBase();
+
 	virtual void BeginPlay() override;
 
 
@@ -70,10 +72,6 @@ private:
 
 
 	// Setup
-	UPROPERTY(EditDefaultsOnly, Category = "Snake|Snakepawn",
-		meta=(AllowPrivateAccess="true"))
-	TObjectPtr<AActor> SnakeSpawnPoint;
-
 	UPROPERTY(EditDefaultsOnly, Category = "Snake|SnakePawn",
 		meta=(AllowPrivateAccess="true"))
 	TSubclassOf<AASnakeGridwalkerPawn> SnakePawnClass;
@@ -93,6 +91,10 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Grid",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGridSettingsDataAsset> GridStartupSettingsPreset;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Snake|Grid",
+		meta=(AllowPrivateAccess="true"))
+	FIntPoint SnakeSpawnCell = FIntPoint(0, 0);
 
 	// Runtime set
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",

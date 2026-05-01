@@ -88,17 +88,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	int32 GetCellSize() const { return CellSize; }
 
+	// don't use this 
 	UFUNCTION(BlueprintPure, Category = "Grid")
-	FVector GetSnakeSpawnPoint() const;
+	FIntPoint GetSnakeSpawnWorldLocation() const;
+
+	// use this
+	UFUNCTION(BlueprintPure, Category = "Grid")
+	FIntPoint GetSnakeSpawnCell() const { return SnakeSpawnCell; }
 
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsInBounds(const FIntPoint& Cell) const;
 
 	UFUNCTION(BlueprintPure, Category = "Grid")
-	FVector CellToWorld(const FIntPoint& Cell) const;
+	FVector GridToWorld(const FIntPoint& Cell) const;
 
 	UFUNCTION(BlueprintPure, Category = "Grid") // BlueprintCallable or BlueprintPure, and why? 
-	FIntPoint WorldToCell(const FVector& WorldLocation) const;
+	FIntPoint WorldToGrid(const FVector& WorldLocation) const;
 
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsCellBlockedByBoard(const FIntPoint& Cell) const;
@@ -121,33 +126,38 @@ private:
 	// Fix height, rotation and direction to be grid-reliant instead of world space?  
 
 	// base settings
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	FIntPoint GridDimensions = FIntPoint(40, 40);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true"))
 	FVector2D GridOrigin = FVector2D::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true"))
 	float GridWorldZ = 0.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 CellSize = 100;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+	// don't use this 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AActor> SnakeSpawnPoint;
 
+	// going to use this 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
+		meta = (AllowPrivateAccess = "true"))
+	FIntPoint SnakeSpawnCell = FIntPoint(0, 0);
 
 	// visuals
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true"))
 	bool bHasFancyWalls = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Settings",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true"))
 	bool bHasFancyFloor = false;
 

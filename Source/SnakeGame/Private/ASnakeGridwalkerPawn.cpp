@@ -434,7 +434,7 @@ FVector AASnakeGridwalkerPawn::GetHeadWorldLocationForCell(const FIntPoint& Cell
 		return GetActorLocation();
 	}
 
-	FVector GridLocation = GridManager->CellToWorld(Cell);
+	FVector GridLocation = GridManager->GridToWorld(Cell);
 	GridLocation.Z += GetHeadPlacementHalfHeight();
 	return GridLocation;
 }
