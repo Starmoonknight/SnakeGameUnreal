@@ -175,6 +175,9 @@ private:
 	void StartHeadTurnVisual(EGridDirection NewDirection);
 	void UpdateHeadTurnVisual(float DeltaTime);
 
+	void StartHeadMoveVisual(const FVector& PreviousHeadWorldLocation);
+	void UpdateHeadMoveVisual(float DeltaTime);
+
 	void AddBodyVisualSegment(const FIntPoint& BodyCell);
 	void UpdateBodyVisualTransforms();
 	void SyncBodyVisuals();
@@ -314,6 +317,11 @@ private:
 
 	float StepAccumulator = 0.0f;
 	float TurnRotationElapsed = 0.0f;
+
+	float HeadMoveVisualElapsed = 0.0f;
+	FVector HeadMoveVisualStartRelativeLocation = FVector::ZeroVector;
+	FVector HeadMoveVisualRestRelativeLocation = FVector::ZeroVector;
+	bool bIsHeadMovingVisually = false;
 
 	// switch to using TRotator later when I need pitch/roll too
 	float TurnStartYaw = 0.0f;

@@ -91,6 +91,10 @@ ASnakeGridwalkerPawn::ASnakeGridwalkerPawn()
 
 	VisualSegmentMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("VisualSegmentMesh"));
 	VisualSegmentMesh->SetupAttachment(RootComponent);
+	// trying to fix flashing lights when snake moves with these below, temp:
+	VisualSegmentMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	VisualSegmentMesh->SetMobility(EComponentMobility::Movable);
+	VisualSegmentMesh->SetCastShadow(false);
 
 	// attach the SpringArm to the sphere and set position settings
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
@@ -103,10 +107,16 @@ ASnakeGridwalkerPawn::ASnakeGridwalkerPawn()
 	SpringArm->bInheritPitch = false; // are these three still needed? This, 
 	SpringArm->bInheritRoll = false; // this,
 	SpringArm->bInheritYaw = false; // and this.
+	SpringArm->bEnableCameraLag = true;
+	SpringArm->CameraLagSpeed = 2.0F;
+	SpringArm->CameraLagMaxDistance = 900.0F;
 
 	// attach the camera to the SpringArm
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName); // new, use of SocketName word
+	// trying to fix flashing lights when snake moves with these below, temp:
+	Camera->PostProcessSettings.bOverride_MotionBlurAmount = true;
+	Camera->PostProcessSettings.MotionBlurAmount = 0.0f;
 
 	bUseControllerRotationYaw = false; // new
 }
@@ -122,6 +132,11 @@ void ASnakeGridwalkerPawn::OnConstruction(const FTransform& Transform)
 void ASnakeGridwalkerPawn::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (SnakeHeadMesh)
+	{
+		HeadMoveVisualRestRelativeLocation = SnakeHeadMesh->GetRelativeLocation();
+	}
 
 	// snake needs to be spawned by deferred spawning since it uses a reference set in that interaction here
 	ResetSnake();
@@ -146,6 +161,7 @@ void ASnakeGridwalkerPawn::Tick(float DeltaTime)
 	}
 
 	UpdateHeadTurnVisual(DeltaTime);
+	UpdateHeadMoveVisual(DeltaTime);
 
 	if (!bMovementActive || bMovementPaused)
 	{
@@ -276,7 +292,12 @@ void ASnakeGridwalkerPawn::ResetSnake()
 	if (SnakeHeadMesh)
 	{
 		SnakeHeadMesh->SetRelativeRotation(FRotator(0.0f, TurnTargetYaw, 0.0f));
+		SnakeHeadMesh->SetRelativeLocation(HeadMoveVisualRestRelativeLocation);
 	}
+
+	HeadMoveVisualElapsed = 0.0f;
+	bIsHeadMovingVisually = false;
+	HeadMoveVisualStartRelativeLocation = HeadMoveVisualRestRelativeLocation;
 
 	if (VisualSegmentMesh)
 	{
@@ -494,6 +515,52 @@ void ASnakeGridwalkerPawn::UpdateHeadTurnVisual(float DeltaTime)
 	//UKismetMathLibrary::RInterpTo();
 }
 
+void ASnakeGridwalkerPawn::StartHeadMoveVisual(const FVector& PreviousHeadWorldLocation)
+{
+	if (!SnakeHeadMesh)
+	{
+		return;
+	}
+
+	HeadMoveVisualStartRelativeLocation =
+		GetActorTransform().InverseTransformPosition(PreviousHeadWorldLocation);
+
+	HeadMoveVisualElapsed = 0.0f;
+	bIsHeadMovingVisually = true;
+
+	SnakeHeadMesh->SetRelativeLocation(HeadMoveVisualStartRelativeLocation);
+}
+
+void ASnakeGridwalkerPawn::UpdateHeadMoveVisual(float DeltaTime)
+{
+	if (!bIsHeadMovingVisually || !SnakeHeadMesh)
+	{
+		return;
+	}
+
+	HeadMoveVisualElapsed += DeltaTime;
+
+	const float RawAlpha = FMath::Clamp(HeadMoveVisualElapsed / StepInterval, 0.0f, 1.0f);
+
+	// SmoothAlpha makes head starts slower, speeds up, then slows down. 
+	// Note: Test how it feels compared to steady speed later.
+	const float SmoothAlpha = RawAlpha * RawAlpha * (3.0f - 2.0f * RawAlpha);
+
+	const FVector NewRelativeLocation = FMath::Lerp(
+		HeadMoveVisualStartRelativeLocation,
+		HeadMoveVisualRestRelativeLocation,
+		SmoothAlpha);
+
+	SnakeHeadMesh->SetRelativeLocation(NewRelativeLocation);
+
+	if (RawAlpha >= 1.0f)
+	{
+		SnakeHeadMesh->SetRelativeLocation(HeadMoveVisualRestRelativeLocation);
+		HeadMoveVisualElapsed = 0.0f;
+		bIsHeadMovingVisually = false;
+	}
+}
+
 void ASnakeGridwalkerPawn::AddBodyVisualSegment(const FIntPoint& BodyCell)
 {
 	if (!VisualSegmentMesh)
@@ -631,7 +698,11 @@ void ASnakeGridwalkerPawn::UpdateHeadWorldLocation(const FIntPoint& NextHeadCell
 		return;
 	}
 
-	SetActorLocation(GetHeadWorldLocationForCell(NextHeadCell));
+	const FVector PreviousHeadWorldLocation = GetActorLocation();
+	const FVector NewHeadWorldLocation = GetHeadWorldLocationForCell(NextHeadCell);
+
+	SetActorLocation(NewHeadWorldLocation);
+	StartHeadMoveVisual(PreviousHeadWorldLocation);
 }
 
 void ASnakeGridwalkerPawn::AdvanceBodySegments(FIntPoint VacatedCell)
