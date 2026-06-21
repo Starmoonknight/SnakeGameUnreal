@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
+#include "SnakeGameTypes.h"
 #include "SnakeGameState.generated.h"
 
 UENUM(BlueprintType)
@@ -57,6 +58,12 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Snake")
 	ESnakeMatchPhase MatchPhase = ESnakeMatchPhase::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Snake")
+	ESnakeGameModeType PlayMode = ESnakeGameModeType::SinglePlayer;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Battle")
+	ESnakeBattleResult BattleResult = ESnakeBattleResult::None;
 
 	void AddScore(int32 NewScore)
 	{

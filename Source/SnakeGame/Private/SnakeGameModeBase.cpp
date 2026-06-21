@@ -217,12 +217,36 @@ int32 ASnakeGameModeBase::GetFinalScore() const
 void ASnakeGameModeBase::StartSinglePlayerRun()
 {
 	ActiveLocalPlayerCount = 1;
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->PlayMode = ESnakeGameModeType::SinglePlayer;
+	}
+
 	StartPlayingRun();
 }
 
 void ASnakeGameModeBase::StartCooperativeRun()
 {
 	ActiveLocalPlayerCount = 2;
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->PlayMode = ESnakeGameModeType::Cooperative;
+	}
+
+	StartPlayingRun();
+}
+
+void ASnakeGameModeBase::StartVersusRun()
+{
+	ActiveLocalPlayerCount = 2;
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->PlayMode = ESnakeGameModeType::Versus;
+	}
+
 	StartPlayingRun();
 }
 

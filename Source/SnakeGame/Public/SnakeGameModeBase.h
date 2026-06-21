@@ -57,6 +57,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Snake|Flow")
 	void StartCooperativeRun();
 
+	UFUNCTION(BlueprintCallable, Category = "Snake|Flow")
+	void StartVersusRun();
+
 	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void StartPlayingRun();
 
