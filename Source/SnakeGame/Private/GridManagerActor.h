@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GridSettingsTypes.h"
 #include "GridManagerActor.generated.h"
 
 class UStaticMesh;
@@ -108,6 +109,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Grid")
 	bool IsCellBlockedByBoard(const FIntPoint& Cell) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Grid|Setup")
+	void ApplyRuntimeSettings(const FGridStartupSettings& Settings);
+
 	void InitializeGridForGameplay();
 
 private:
@@ -119,6 +123,7 @@ private:
 
 	// board setup 
 	void InitializeCells();
+	void GenerateInternalWalls();
 	void BuildTiledFloor();
 	void SetupGridVisuals_Stretchy();
 
@@ -141,6 +146,14 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",
 		meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 CellSize = 100;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Grid|Runtime",
+		meta = (AllowPrivateAccess = "true"))
+	int32 InternalWallSpacing = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Grid|Runtime",
+		meta = (AllowPrivateAccess = "true"))
+	int32 RootSeed = 12345;
 
 	// don't use this 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|DefaultSettings",

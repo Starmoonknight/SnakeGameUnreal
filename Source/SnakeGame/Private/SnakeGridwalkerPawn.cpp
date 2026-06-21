@@ -73,7 +73,8 @@ ASnakeGridwalkerPawn::ASnakeGridwalkerPawn()
 	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	AutoPossessPlayer = EAutoReceiveInput::Player0;
+	// Gamemode should add correct controller? 
+	AutoPossessPlayer = EAutoReceiveInput::Disabled;
 
 	// Collision Sphere is the root object
 	CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
@@ -81,6 +82,9 @@ ASnakeGridwalkerPawn::ASnakeGridwalkerPawn()
 	CollisionSphere->SetSphereRadius(45.f);
 	CollisionSphere->SetCollisionProfileName(TEXT("Pawn"));
 	CollisionSphere->SetGenerateOverlapEvents(true);
+	CollisionSphere->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	CollisionSphere->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Overlap);
+	CollisionSphere->OnComponentBeginOverlap.AddDynamic(this, &ASnakeGridwalkerPawn::HandleCollisionOverlap);
 
 	// attach the VisualMesh to the sphere
 	SnakeHeadMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SnakeHeadMesh"));
@@ -215,6 +219,11 @@ void ASnakeGridwalkerPawn::ConfigureForGrid(AGridManagerActor* InGridManager, co
 	GridManager = InGridManager;
 	SpawnCell = InSpawnCell;
 	GridCellHeadPosition = InSpawnCell;
+}
+
+void ASnakeGridwalkerPawn::SetStartupSettingsPreset(USnakeSettingsDataAsset* InPreset)
+{
+	StartupSettingsPreset = InPreset;
 }
 
 bool ASnakeGridwalkerPawn::TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const
@@ -674,7 +683,50 @@ bool ASnakeGridwalkerPawn::CheckForCollision(const FIntPoint& NextHeadCell)
 		return true;
 	}
 
+	// check for hitting other snake 
+	if (UWorld* World = GetWorld())
+	{
+		if (const ASnakeGameModeBase* SnakeGameMode =
+			World->GetAuthGameMode<ASnakeGameModeBase>())
+		{
+			if (SnakeGameMode->AnyOtherSnakeOnThisCell(NextHeadCell, this))
+			{
+				HandleDeath();
+				return true;
+			}
+		}
+	}
+
+
 	return false;
+}
+
+void ASnakeGridwalkerPawn::HandleCollisionOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+                                                  UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
+                                                  bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (!bIsAlive || !OtherActor || OtherActor == this)
+	{
+		return;
+	}
+
+	if (const ASnakeGridwalkerPawn* OtherSnake = Cast<ASnakeGridwalkerPawn>(OtherActor))
+	{
+		if (OtherSnake->IsAlive())
+		{
+			HandleDeath();
+		}
+		return;
+	}
+
+	const bool bHitWall =
+		(OtherComponent && OtherComponent->ComponentHasTag(TEXT("SnakeWall"))) ||
+		OtherActor->ActorHasTag(TEXT("SnakeWall"));
+
+	if (bHitWall)
+	{
+		HandleDeath();
+	}
 }
 
 void ASnakeGridwalkerPawn::HandleDeath()

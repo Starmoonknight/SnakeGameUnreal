@@ -65,25 +65,47 @@ AGridManagerActor::AGridManagerActor()
 	FloorVisuals->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	FloorVisuals->SetSimulatePhysics(false);
 
+	// Boarder walls 
 	NorthWallVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("NorthWallMesh"));
-	NorthWallVisual->SetupAttachment(SceneRoot);
-	NorthWallVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	NorthWallVisual->SetSimulatePhysics(false);
 
 	SouthWallVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SouthWallMesh"));
-	SouthWallVisual->SetupAttachment(SceneRoot);
-	SouthWallVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	SouthWallVisual->SetSimulatePhysics(false);
 
 	EastWallVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("EastWallMesh"));
-	EastWallVisual->SetupAttachment(SceneRoot);
-	EastWallVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	EastWallVisual->SetSimulatePhysics(false);
 
 	WestWallVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WestWallMesh"));
-	WestWallVisual->SetupAttachment(SceneRoot);
-	WestWallVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	WestWallVisual->SetSimulatePhysics(false);
+
+	// Settings for the boarder walls 
+	UStaticMeshComponent* BoundaryWalls[] =
+	{
+		NorthWallVisual,
+		SouthWallVisual,
+		EastWallVisual,
+		WestWallVisual
+	};
+
+	for (UStaticMeshComponent* Wall : BoundaryWalls)
+	{
+		Wall->SetupAttachment(SceneRoot);
+		Wall->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		Wall->SetCollisionObjectType(ECC_WorldStatic);
+		Wall->SetCollisionResponseToAllChannels(ECR_Ignore);
+		Wall->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+		Wall->SetGenerateOverlapEvents(true);
+		Wall->SetSimulatePhysics(false);
+		Wall->ComponentTags.Add(TEXT("SnakeWall"));
+	}
+
+
+	// internal Walls
+	WallInstances = CreateDefaultSubobject<UInstancedStaticMeshComponent>(
+		TEXT("GeneratedWallInstances"));
+	WallInstances->SetupAttachment(SceneRoot);
+	WallInstances->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	WallInstances->SetCollisionObjectType(ECC_WorldStatic);
+	WallInstances->SetCollisionResponseToAllChannels(ECR_Ignore);
+	WallInstances->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	WallInstances->SetGenerateOverlapEvents(true);
+	WallInstances->ComponentTags.Add(TEXT("SnakeWall"));
 }
 
 void AGridManagerActor::OnConstruction(const FTransform& Transform)
@@ -156,6 +178,22 @@ bool AGridManagerActor::IsCellBlockedByBoard(const FIntPoint& Cell) const
 void AGridManagerActor::InitializeGridForGameplay()
 {
 	InitializeCells();
+	GenerateInternalWalls();
+}
+
+void AGridManagerActor::ApplyRuntimeSettings(const FGridStartupSettings& Settings)
+{
+	GridDimensions.X = FMath::Max(Settings.GridDimensions.X, 3);
+	GridDimensions.Y = FMath::Max(Settings.GridDimensions.Y, 3);
+
+	GridOrigin = Settings.GridOrigin;
+	GridWorldZ = Settings.GridWorldZ;
+	CellSize = FMath::Max(Settings.CellSize, 1);
+	InternalWallSpacing = FMath::Max(Settings.InternalWallSpacing, 0);
+	RootSeed = Settings.RootSeed;
+
+	SetupGridVisuals_Stretchy();
+	InitializeGridForGameplay();
 }
 
 
@@ -225,6 +263,60 @@ void AGridManagerActor::InitializeCells()
 	for (EGridCellType& CellType : Cells)
 	{
 		CellType = EGridCellType::Empty;
+	}
+}
+
+void AGridManagerActor::GenerateInternalWalls()
+{
+	if (!WallInstances)
+	{
+		return;
+	}
+
+	WallInstances->ClearInstances();
+	WallInstances->SetStaticMesh(GetWallMeshToUse());
+
+	if (InternalWallSpacing < 2)
+	{
+		return;
+	}
+
+	const float MeshScale = static_cast<float>(CellSize) / 100.0f;
+
+	// Generate one vertical wall stripe every InternalWallSpacing columns
+	for (int32 X = InternalWallSpacing; X < GridDimensions.X - 1; X += InternalWallSpacing)
+	{
+		// Should leave two free cells near the top and bottom of the playable grid
+		for (int32 Y = 2; Y < GridDimensions.Y - 2; ++Y)
+		{
+			// Alternate openings between one-third and two-thirds of the grid height,
+			// should make it so openings don't line up on same row and keep every generated stripe navigable
+			const int32 OpeningY =
+				((X / InternalWallSpacing) % 2 == 0)
+					? GridDimensions.Y / 3
+					: (GridDimensions.Y * 2) / 3;
+
+			// Skip the openings + one neighboring cell on each side, should make three cell wide gaps 
+			if (FMath::Abs(Y - OpeningY) <= 1)
+			{
+				continue;
+			}
+
+			// ALSO NEED TO ADD SO WALLS DON'T SPAWN ON SNAEK 
+
+			const FIntPoint Cell(X, Y);
+
+			// update so game knows the cell-tile is blocked for game logic 
+			Cells[FlatIndex(Cell)] = EGridCellType::Blocked;
+
+			// get the values for where to spawn the wall visuals 
+			FVector WorldLocation = GridToWorld(Cell);
+			WorldLocation.Z += CellSize * 0.5f;
+
+			const FVector LocalLocation = GetActorTransform().InverseTransformPosition(WorldLocation);
+
+			WallInstances->AddInstance(FTransform(FRotator::ZeroRotator, LocalLocation, FVector(MeshScale)));
+		}
 	}
 }
 

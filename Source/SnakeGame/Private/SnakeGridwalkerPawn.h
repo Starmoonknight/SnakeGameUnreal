@@ -20,6 +20,7 @@ class UStaticMeshComponent;
 class UInstancedStaticMeshComponent;
 class UMaterialInterface;
 class USphereComponent;
+class UPrimitiveComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
@@ -77,6 +78,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Snake|Setup")
 	void ConfigureForGrid(AGridManagerActor* InGridManager, const FIntPoint& InSpawnCell);
 
+	UFUNCTION(BlueprintCallable, Category = "Snake|Setup")
+	void SetStartupSettingsPreset(USnakeSettingsDataAsset* InPreset);
+
 	// --- Events --- 
 	UPROPERTY(BlueprintAssignable, Category = "Snake|Events")
 	FSnakeDiedSignature OnSnakeDied;
@@ -109,20 +113,23 @@ public:
 	//		BodyCells is small in this project, so the copy is fine for now."
 
 	// Occupancy
-	UFUNCTION(BlueprintPure, Category="Snake")
+	UFUNCTION(BlueprintPure, Category = "Snake")
 	bool IsHeadAtCell(const FIntPoint& Cell) const { return Cell == GridCellHeadPosition; }
 
-	UFUNCTION(BlueprintPure, Category="Snake")
+	UFUNCTION(BlueprintPure, Category = "Snake")
 	bool HasBodySegmentAtCell(const FIntPoint& Cell) const { return BodyCells.Contains(Cell); }
 
-	UFUNCTION(BlueprintPure, Category="Snake")
+	UFUNCTION(BlueprintPure, Category = "Snake")
 	bool IsSnakeAtCell(const FIntPoint& Cell) const { return (IsHeadAtCell(Cell) || HasBodySegmentAtCell(Cell)); }
 
+	UFUNCTION(BlueprintPure, Category = "Snake")
+	bool IsAlive() const { return bIsAlive; }
+
 	// Body-Segment Access/Lookup 
-	UFUNCTION(BlueprintPure, Category="Snake")
+	UFUNCTION(BlueprintPure, Category = "Snake")
 	bool TryGetBodyCellPositionByIndex(int32 SegmentIndex, FIntPoint& OutCell) const;
 
-	UFUNCTION(BlueprintPure, Category="Snake")
+	UFUNCTION(BlueprintPure, Category = "Snake")
 	bool TryFindBodyIndexAtCell(const FIntPoint& Cell, int32& OutSegmentIndex) const;
 
 #pragma endregion
@@ -189,6 +196,11 @@ private:
 	bool CheckForCollision(const FIntPoint& NextHeadCell);
 
 	void HandleDeath();
+
+	UFUNCTION()
+	void HandleCollisionOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	                            UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep,
+	                            const FHitResult& SweepResult);
 
 	void UpdateHeadWorldLocation(const FIntPoint& NextHeadCell);
 	void AdvanceBodySegments(FIntPoint VacatedCell);

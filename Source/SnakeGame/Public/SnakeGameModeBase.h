@@ -11,6 +11,7 @@ class AFoodActor;
 class AGridManagerActor;
 class USnakeSettingsDataAsset;
 class UGridSettingsDataAsset;
+class USnakeStageSettingsDataAsset;
 class ASnakeGameState;
 
 class UUserWidget;
@@ -41,13 +42,29 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool AnySnakeOnThisCell(const FIntPoint& Cell) const;
 
+	bool AnyOtherSnakeOnThisCell(const FIntPoint& Cell, const ASnakeGridwalkerPawn* IgnoredSnake) const;
+
+	UFUNCTION(BlueprintPure, Category = "Snake|Flow")
+	int32 GetFinalScore() const;
+
+	UFUNCTION(BlueprintPure, Category = "Snake|Flow")
+	int32 GetCurrentStageNumber() const { return CurrentStageIndex + 1; }
+
 	// --- Logic setters --- 
+	UFUNCTION(BlueprintCallable, Category = "Snake|Flow")
+	void StartSinglePlayerRun();
+
+	UFUNCTION(BlueprintCallable, Category = "Snake|Flow")
+	void StartCooperativeRun();
 
 	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void StartPlayingRun();
 
 	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void RestartRun();
+
+	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
+	void ReturnToMainMenu();
 
 	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void RespawnFruit_Temp();
@@ -59,11 +76,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|UI")
 	TSubclassOf<UUserWidget> OutroWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|UI")
+	TSubclassOf<UUserWidget> HUDWidgetClass;
+
 	UPROPERTY()
 	TObjectPtr<UUserWidget> MainMenuWidgetInstance;
 
 	UPROPERTY()
 	TObjectPtr<UUserWidget> OutroWidgetInstance;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> HUDWidgetInstance;
 
 private:
 	void CacheGridManager();
@@ -74,13 +97,26 @@ private:
 	bool TryFindRandomFreeCell_Flexible(FIntPoint& OutCell, const TArray<FIntPoint>& ForbiddenCells,
 	                                    FRandomStream& RandomStream) const;
 
-	void SpawnSnake();
+	void EnsureLocalPlayers();
+	void SpawnSnakes();
+	void SpawnSnakeForPlayer(int32 PlayerIndex, const FIntPoint& RequestedSpawnCell);
+
+	FIntPoint GetSpawnCellForPlayer(int32 PlayerIndex) const;
+	void ClearSpawnedActors();
+
 	void SpawnFruit_Destructive(const FIntPoint& Cell);
+
+	void LoadStage(int32 StageIndex);
+	const USnakeStageSettingsDataAsset* GetStagePreset(int32 StageIndex) const;
+	int32 GetStageCount() const;
+	void CompleteRun();
 
 	// UI 
 	void ShowMainMenuWidget();
 	void ShowOutroWidget();
+	void ShowHUDWidget();
 	void HideMenuWidgets();
+	void HideHUDWidget();
 
 	void SetMenuInputMode();
 	void SetGameplayInputMode();
@@ -98,10 +134,15 @@ private:
 
 
 	// Setup
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Stages",
+		meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<USnakeStageSettingsDataAsset>> StagePresets;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Snake|SnakePawn",
 		meta=(AllowPrivateAccess="true"))
 	TSubclassOf<ASnakeGridwalkerPawn> SnakePawnClass;
 
+	// NOTE: This will be decrepit soon when StagePresets will be used to handle setup, remove soon!  
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|SnakePawn",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USnakeSettingsDataAsset> SnakeStartupSettingsPreset;
@@ -114,6 +155,7 @@ private:
 		meta=(AllowPrivateAccess="true"))
 	TSubclassOf<AGridManagerActor> GridManagerClass;
 
+	// NOTE: This will be decrepit soon when StagePresets will be used to handle setup, remove soon!  
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Grid",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGridSettingsDataAsset> GridStartupSettingsPreset;
@@ -123,6 +165,11 @@ private:
 	FIntPoint SnakeSpawnCell = FIntPoint(0, 0);
 
 	// Runtime set
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Snake|Runtime",
+		meta = (AllowPrivateAccess = "true"))
+	int32 ActiveLocalPlayerCount = 2;
+
+	// Remove this soon? Since using SpawnedSnakes now.
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ASnakeGridwalkerPawn> SpawnedSnakePawn;

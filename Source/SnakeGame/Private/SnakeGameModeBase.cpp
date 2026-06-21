@@ -8,10 +8,10 @@
 #include "FoodActor.h"
 #include "GridManagerActor.h"
 //#include "SnakeGameTypes.h"
-#include "SnakeGameModeBase.h"
 
-#include "SnakeSettingsTypes.h"
-#include "GridSettingsTypes.h"
+#include "SnakeStageSettingsDataAsset.h"
+#include "SnakeSettingsDataAsset.h"
+#include "GridSettingsDataAsset.h"
 
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
@@ -119,30 +119,28 @@ ASnakeGameState* ASnakeGameModeBase::GetSnakeGameState()
 void ASnakeGameModeBase::StartPlayingRun()
 {
 	HideMenuWidgets();
+	HideHUDWidget();
 	SetGameplayInputMode();
 
 	//BattleResult = ESnakeBattleResult::None;
 
-	ScoreThisStage = 0;
 
+	// same with this part, should it be removed or modified? 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
 		GS->Score = 0;
+		GS->OnScoreChanged.Broadcast(0);
 		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
 
+		// clear away the old end game message 
 		if (GEngine)
 		{
-			// clear away the old end game message 
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(
-					2,
-					0.01f,
-					FColor::Red,
-					TEXT("")
-				);
-			}
-
+			GEngine->AddOnScreenDebugMessage(
+				2,
+				0.01f,
+				FColor::Red,
+				TEXT("")
+			);
 			const FString MatchPhaseName =
 				StaticEnum<ESnakeMatchPhase>()->GetNameStringByValue(
 					static_cast<int64>(GS->MatchPhase)
@@ -160,8 +158,6 @@ void ASnakeGameModeBase::StartPlayingRun()
 	}
 
 
-	//LoadStage(0);
-
 	FindOrSpawnGridManager();
 
 	if (!GridManager)
@@ -170,16 +166,63 @@ void ASnakeGameModeBase::StartPlayingRun()
 		return;
 	}
 
-	GridManager->InitializeGridForGameplay();
+	if (GetStageCount() < 3)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("At least three stage presets are required."));
 
-	SpawnSnake();
-	RespawnFruit_Temp();
+		return;
+	}
 
-	StartGameLoop();
+	EnsureLocalPlayers();
+	ShowHUDWidget();
+	LoadStage(0);
 }
 
 void ASnakeGameModeBase::RestartRun()
 {
+	StartPlayingRun();
+}
+
+void ASnakeGameModeBase::ReturnToMainMenu()
+{
+	StopGameLoop();
+	ClearSpawnedActors();
+	HideHUDWidget();
+
+	// Single-player only needs Player 0
+	if (APlayerController* SecondPlayer =
+		UGameplayStatics::GetPlayerController(this, 1))
+	{
+		UGameplayStatics::RemovePlayer(SecondPlayer, true);
+	}
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->SetMatchPhase(ESnakeMatchPhase::MainMenu);
+	}
+
+	ShowMainMenuWidget();
+}
+
+
+int32 ASnakeGameModeBase::GetFinalScore() const
+{
+	const ASnakeGameState* GS = GetGameState<ASnakeGameState>();
+	return GS ? GS->Score : 0;
+}
+
+void ASnakeGameModeBase::StartSinglePlayerRun()
+{
+	ActiveLocalPlayerCount = 1;
+	StartPlayingRun();
+}
+
+void ASnakeGameModeBase::StartCooperativeRun()
+{
+	ActiveLocalPlayerCount = 2;
 	StartPlayingRun();
 }
 
@@ -213,21 +256,9 @@ TArray<FIntPoint> ASnakeGameModeBase::GetAllSnakeOccupiedCells() const
 {
 	TArray<FIntPoint> OccupiedCells;
 
-	if (!IsValid(SpawnedSnakePawn))
+	for (const ASnakeGridwalkerPawn* Snake : SpawnedSnakes)
 	{
-		return OccupiedCells;
-	}
-
-	OccupiedCells.Add(SpawnedSnakePawn->GetHeadCellPosition());
-	OccupiedCells.Append(SpawnedSnakePawn->GetBodyCellPositions());
-
-	return OccupiedCells;
-
-	// for later when SpawnedSnakes gets set: 
-	/*
-	for (const AASnakeGridwalkerPawn* Snake : SpawnedSnakes)
-	{
-		if (!Snake)
+		if (!IsValid(Snake))
 		{
 			continue;
 		}
@@ -237,31 +268,33 @@ TArray<FIntPoint> ASnakeGameModeBase::GetAllSnakeOccupiedCells() const
 	}
 
 	return OccupiedCells;
-	*/
 }
 
 bool ASnakeGameModeBase::AnySnakeOnThisCell(const FIntPoint& Cell) const
 {
-	return IsValid(SpawnedSnakePawn)
-		&& SpawnedSnakePawn->IsSnakeAtCell(Cell);
-
-	// for later when SpawnedSnakes gets set: 
-	/*
-	for (const AASnakeGridwalkerPawn* Snake : SpawnedSnakes)
+	for (const ASnakeGridwalkerPawn* Snake : SpawnedSnakes)
 	{
-		if (!Snake)
-		{
-			continue;
-		}
-
-		if (Snake->IsSnakeAtCell(Cell))
+		if (IsValid(Snake) && Snake->IsSnakeAtCell(Cell))
 		{
 			return true;
 		}
 	}
 
 	return false;
-	*/
+}
+
+bool ASnakeGameModeBase::AnyOtherSnakeOnThisCell(const FIntPoint& Cell, const ASnakeGridwalkerPawn* IgnoredSnake) const
+{
+	for (const ASnakeGridwalkerPawn* Snake : SpawnedSnakes)
+	{
+		if (IsValid(Snake) && Snake != IgnoredSnake &&
+			Snake->IsAlive() && Snake->IsSnakeAtCell(Cell))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool ASnakeGameModeBase::IsCellFreeForGameplay(const FIntPoint& Cell) const
@@ -345,18 +378,65 @@ bool ASnakeGameModeBase::TryFindRandomFreeCell_Flexible(
 	return true;
 }
 
+void ASnakeGameModeBase::EnsureLocalPlayers()
+{
+	ActiveLocalPlayerCount = FMath::Clamp(ActiveLocalPlayerCount, 1, 2);
 
-void ASnakeGameModeBase::SpawnSnake()
+	APlayerController* SecondPlayer = UGameplayStatics::GetPlayerController(this, 1);
+
+	// when only single player 
+	if (ActiveLocalPlayerCount == 1)
+	{
+		if (SecondPlayer)
+		{
+			UGameplayStatics::RemovePlayer(SecondPlayer, true);
+		}
+
+		return;
+	}
+
+	if (!SecondPlayer)
+	{
+		UGameplayStatics::CreatePlayer(this, -1, true);
+	}
+
+	if (!UGameplayStatics::GetPlayerController(this, 1))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Could not create the second local player."));
+	}
+}
+
+
+void ASnakeGameModeBase::SpawnSnakes()
+{
+	SpawnedSnakes.Reset();
+	SpawnedSnakePawn = nullptr;
+
+	for (int32 PlayerIndex = 0; PlayerIndex < ActiveLocalPlayerCount; ++PlayerIndex)
+	{
+		SpawnSnakeForPlayer(PlayerIndex, GetSpawnCellForPlayer(PlayerIndex));
+	}
+
+	// temporary,compatibility with older single-snake code.  Remove after full transition 
+	if (!SpawnedSnakes.IsEmpty())
+	{
+		SpawnedSnakePawn = SpawnedSnakes[0];
+	}
+}
+
+void ASnakeGameModeBase::SpawnSnakeForPlayer(int32 PlayerIndex, const FIntPoint& RequestedSpawnCell)
 {
 	if (!SnakePawnClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode has no SnakeClass assigned."));
+		UE_LOG(LogTemp, Error, TEXT("Cannot spawn player %d snake: missing class."),
+		       PlayerIndex);
 		return;
 	}
 
 	if (!GridManager)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode has no GridManager assigned."));
+		UE_LOG(LogTemp, Error, TEXT("Cannot spawn player %d snake: missing grid."),
+		       PlayerIndex);
 		return;
 	}
 
@@ -366,60 +446,211 @@ void ASnakeGameModeBase::SpawnSnake()
 		return;
 	}
 
-	if (IsValid(SpawnedSnakePawn))
+	FIntPoint ResolvedSpawnCell = RequestedSpawnCell;
+
+	const bool bRequestedCellInvalid =
+		!GridManager->IsInBounds(ResolvedSpawnCell) ||
+		GridManager->IsCellBlockedByBoard(ResolvedSpawnCell) ||
+		AnySnakeOnThisCell(ResolvedSpawnCell);
+
+	if (bRequestedCellInvalid)
 	{
-		SpawnedSnakePawn->Destroy();
-		SpawnedSnakePawn = nullptr;
+		if (!TryFindRandomFreeCell(ResolvedSpawnCell))
+		{
+			UE_LOG(LogTemp, Error, TEXT("No valid spawn cell for player %d."),
+			       PlayerIndex);
+
+			return;
+		}
 	}
 
-	// FIntPoint SnakeSpawnCell(GridManager->GetWidth() / 2, GridManager->GetHeight() / 2);
-	// if (SnakeSpawnPoint)
-	// {
-	// 	SnakeSpawnCell = GridManager->WorldToGrid(SnakeSpawnPoint->GetActorLocation());
-	// }
-	SnakeSpawnCell = GridManager->GetSnakeSpawnCell();
+	const FVector SpawnLocation = GridManager->GridToWorld(ResolvedSpawnCell);
+	const FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
 
-
-	// need to align to propper cell placement first
-	if (!GridManager->IsInBounds(SnakeSpawnCell))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Snake spawn location was outside the grid. Falling back to cell 0,0."));
-		SnakeSpawnCell = FIntPoint::ZeroValue;
-	}
-
-	const FVector SpawnLocation = GridManager->GridToWorld(SnakeSpawnCell);
-	const FRotator SpawnRotator = FRotator::ZeroRotator;
-	const FTransform SpawnTransform(SpawnRotator, SpawnLocation);
-
-	ASnakeGridwalkerPawn* NewSnake =
-		World->SpawnActorDeferred<ASnakeGridwalkerPawn>(
-			SnakePawnClass,
-			SpawnTransform,
-			nullptr,
-			nullptr,
-			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	ASnakeGridwalkerPawn* NewSnake = World->SpawnActorDeferred<ASnakeGridwalkerPawn>(
+		SnakePawnClass, SpawnTransform,
+		nullptr, nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
 	if (!NewSnake)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to spawn snake."));
 		return;
 	}
 
-	NewSnake->ConfigureForGrid(GridManager, SnakeSpawnCell);
+	NewSnake->ConfigureForGrid(GridManager, ResolvedSpawnCell);
+
+	// set this stages modified start-values before finishing spawning 
+	if (const USnakeStageSettingsDataAsset* StagePreset = GetStagePreset(CurrentStageIndex))
+	{
+		NewSnake->SetStartupSettingsPreset(StagePreset->SnakeSettingsPreset);
+	}
+
+	// complete deferred spawning, lifecycle functions such as BeginPlay() runs   
 	UGameplayStatics::FinishSpawningActor(NewSnake, SpawnTransform);
 
-	SpawnedSnakePawn = NewSnake;
-
 	// is this the safe pattern to avoid accidental double-binding
-	SpawnedSnakePawn->OnSnakeDied.RemoveDynamic(this, &ASnakeGameModeBase::HandleSnakeDeath);
-	SpawnedSnakePawn->OnSnakeDied.AddDynamic(this, &ASnakeGameModeBase::HandleSnakeDeath);
+	NewSnake->OnSnakeDied.RemoveDynamic(this, &ASnakeGameModeBase::HandleSnakeDeath);
+	NewSnake->OnSnakeDied.AddDynamic(this, &ASnakeGameModeBase::HandleSnakeDeath);
 
-	APlayerController* PlayerController = World->GetFirstPlayerController();
+	SpawnedSnakes.Add(NewSnake);
+
+
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, PlayerIndex);
 	if (PlayerController)
 	{
-		PlayerController->Possess(SpawnedSnakePawn);
+		PlayerController->Possess(NewSnake);
 		UE_LOG(LogTemp, Warning, TEXT("PlayerController possessed SnakePawn."));
 	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("No PlayerController for player %d."),
+		       PlayerIndex);
+	}
+}
+
+FIntPoint ASnakeGameModeBase::GetSpawnCellForPlayer(int32 PlayerIndex) const
+{
+	if (!GridManager)
+	{
+		return FIntPoint::ZeroValue;
+	}
+
+	// find a way to spawn player 2 on opposite side of grid, mirrored cell and movement direction, so they move towards each other from different corners 
+	// Say player 1 is bottom left corner moving up, then player 2 is in top right corner moving down. 
+
+	const int32 SpawnX = FMath::Clamp(2, 0, GridManager->GetWidth() - 1);
+
+	const int32 SpawnY =
+		PlayerIndex == 0
+			? FMath::Clamp(2, 0, GridManager->GetHeight() - 1)
+			: FMath::Clamp(GridManager->GetHeight() - 3, 0, GridManager->GetHeight() - 1);
+
+	return FIntPoint(SpawnX, SpawnY);
+}
+
+void ASnakeGameModeBase::ClearSpawnedActors()
+{
+	if (IsValid(SpawnedFoodActor))
+	{
+		SpawnedFoodActor->OnFruitConsumed.RemoveDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
+
+		SpawnedFoodActor->Destroy();
+	}
+
+	SpawnedFoodActor = nullptr;
+
+	for (ASnakeGridwalkerPawn* Snake : SpawnedSnakes)
+	{
+		if (!IsValid(Snake))
+		{
+			continue;
+		}
+
+		Snake->OnSnakeDied.RemoveDynamic(
+			this,
+			&ASnakeGameModeBase::HandleSnakeDeath);
+
+		Snake->Destroy();
+	}
+
+	SpawnedSnakes.Reset();
+	SpawnedSnakePawn = nullptr;
+}
+
+int32 ASnakeGameModeBase::GetStageCount() const
+{
+	return StagePresets.Num();
+}
+
+const USnakeStageSettingsDataAsset* ASnakeGameModeBase::GetStagePreset(int32 StageIndex) const
+{
+	if (!StagePresets.IsValidIndex(StageIndex))
+	{
+		return nullptr;
+	}
+
+	return StagePresets[StageIndex];
+}
+
+void ASnakeGameModeBase::LoadStage(int32 StageIndex)
+{
+	const USnakeStageSettingsDataAsset* StagePreset = GetStagePreset(StageIndex);
+
+	if (!StagePreset)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("Cannot load stage %d: invalid stage index."),
+			StageIndex);
+
+		return;
+	}
+
+	if (!StagePreset->GridSettingsPreset)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("Stage %d has no Grid Settings Preset."),
+			StageIndex);
+
+		return;
+	}
+
+	if (!StagePreset->SnakeSettingsPreset)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("Stage %d has no Snake Settings Preset."),
+			StageIndex);
+
+		return;
+	}
+
+	if (!GridManager)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("Cannot load stage: Grid Manager is missing."));
+
+		return;
+	}
+
+	StopGameLoop();
+	ClearSpawnedActors();
+
+	CurrentStageIndex = StageIndex;
+	ScoreThisStage = 0;
+
+	GridManager->ApplyRuntimeSettings(StagePreset->GridSettingsPreset->GridSettings);
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->CurrentStageIndex = StageIndex;
+		GS->FoodEatenThisStage = 0;
+		GS->PointsGainedThisStage = 0;
+		GS->PointsToClearStage = FMath::Max(StagePreset->StageSettings.FoodToClearStage, 1);
+	}
+
+	SpawnSnakes();
+	RespawnFruit_Temp();
+	StartGameLoop();
+}
+
+void ASnakeGameModeBase::CompleteRun()
+{
+	StopGameLoop();
+	HideHUDWidget();
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->SetMatchPhase(ESnakeMatchPhase::Outro);
+	}
+
+	ShowOutroWidget();
 }
 
 
@@ -480,6 +711,7 @@ void ASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
 	SpawnedFoodActor->OnFruitConsumed.AddDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
 }
 
+
 void ASnakeGameModeBase::ShowMainMenuWidget()
 {
 	HideMenuWidgets();
@@ -530,6 +762,32 @@ void ASnakeGameModeBase::ShowOutroWidget()
 	}
 }
 
+void ASnakeGameModeBase::ShowHUDWidget()
+{
+	HideHUDWidget();
+
+	if (!HUDWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HUDWidgetClass is not assigned."));
+		return;
+	}
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+
+	if (!PC)
+	{
+		return;
+	}
+
+	HUDWidgetInstance = CreateWidget<UUserWidget>(PC, HUDWidgetClass);
+
+	if (HUDWidgetInstance)
+	{
+		// Z-order to 10 keep it above the game viewport
+		HUDWidgetInstance->AddToViewport(10);
+	}
+}
+
 void ASnakeGameModeBase::HideMenuWidgets()
 {
 	if (MainMenuWidgetInstance)
@@ -542,6 +800,15 @@ void ASnakeGameModeBase::HideMenuWidgets()
 	{
 		OutroWidgetInstance->RemoveFromParent();
 		OutroWidgetInstance = nullptr;
+	}
+}
+
+void ASnakeGameModeBase::HideHUDWidget()
+{
+	if (HUDWidgetInstance)
+	{
+		HUDWidgetInstance->RemoveFromParent();
+		HUDWidgetInstance = nullptr;
 	}
 }
 
@@ -576,25 +843,32 @@ void ASnakeGameModeBase::SetGameplayInputMode()
 
 void ASnakeGameModeBase::StartGameLoop()
 {
-	if (!IsValid(SpawnedSnakePawn))
+	if (SpawnedSnakes.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Cannot start game loop: no snake."));
+
 		return;
 	}
 
-	SpawnedSnakePawn->ResetSnake();
-	SpawnedSnakePawn->StartMovement();
+	for (ASnakeGridwalkerPawn* Snake : SpawnedSnakes)
+	{
+		if (IsValid(Snake))
+		{
+			Snake->ResetSnake();
+			Snake->StartMovement();
+		}
+	}
 }
 
 void ASnakeGameModeBase::StopGameLoop()
 {
-	if (!IsValid(SpawnedSnakePawn))
+	for (ASnakeGridwalkerPawn* Snake : SpawnedSnakes)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Cannot stop game loop: no snake."));
-		return;
+		if (IsValid(Snake))
+		{
+			Snake->StopMovement();
+		}
 	}
-
-	SpawnedSnakePawn->StopMovement();
 }
 
 
@@ -610,9 +884,13 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 
 	const int32 ScoreValue = Food->GetScoreValue();
 
-	if (ASnakeGameState* GS = GetSnakeGameState())
+	ASnakeGameState* GS = GetSnakeGameState();
+
+	if (GS)
 	{
 		GS->AddScore(ScoreValue);
+		++GS->FoodEatenThisStage;
+		GS->PointsGainedThisStage += ScoreValue;
 
 		// temp text 
 		if (GEngine)
@@ -635,17 +913,39 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 	ScoreThisStage += ScoreValue;
 
 	SpawnedFoodActor = nullptr;
+
+	const bool bStageComplete =
+		GS &&
+		GS->FoodEatenThisStage >= GS->PointsToClearStage;
+
+	if (bStageComplete)
+	{
+		const int32 NextStageIndex = CurrentStageIndex + 1;
+
+		if (NextStageIndex < GetStageCount())
+		{
+			LoadStage(NextStageIndex);
+		}
+		else
+		{
+			CompleteRun();
+		}
+
+		return;
+	}
+
 	RespawnFruit_Temp();
 }
 
 void ASnakeGameModeBase::HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake)
 {
-	if (DeadSnake != SpawnedSnakePawn)
+	if (!SpawnedSnakes.Contains(DeadSnake))
 	{
 		return;
 	}
 
 	StopGameLoop();
+	HideHUDWidget();
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
