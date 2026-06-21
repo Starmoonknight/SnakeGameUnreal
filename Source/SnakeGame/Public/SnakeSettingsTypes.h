@@ -30,3 +30,20 @@ struct FSnakeStartupSettings
 		meta = (ClampMin = "0", UIMin = "0"))
 	int32 InitialPendingGrowth = 0;
 };
+
+
+USTRUCT(BlueprintType)
+struct FSnakeStageSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Stage",
+		meta = (ClampMin = "1", UIMin = "1"))
+	int32 FoodToClearStage = 3;
+
+	// Future stuff: 
+	//ScoreMultiplier
+	//BonusFoodRules
+	//StageTimeLimit
+	//RequiredSharedScore
+};
