@@ -51,6 +51,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Snake|Flow")
 	int32 GetFinalScore() const;
 
+	//UFUNCTION(BlueprintPure, Category = "Snake|Flow")
+	//int32 GetFinalScoreMultiplayer() const;
+
 	UFUNCTION(BlueprintPure, Category = "Snake|Flow")
 	int32 GetCurrentStageNumber() const { return CurrentStageIndex + 1; }
 
@@ -135,6 +138,7 @@ private:
 	void EnsureLocalPlayers();
 	void SpawnSnakes();
 	void SpawnSnakeForPlayer(int32 PlayerIndex, const FIntPoint& RequestedSpawnCell);
+	int32 GetPlayerIndexForSnake(const ASnakeGridwalkerPawn* Snake) const;
 
 	FIntPoint GetSpawnCellForPlayer(int32 PlayerIndex) const;
 	void ClearSpawnedActors();

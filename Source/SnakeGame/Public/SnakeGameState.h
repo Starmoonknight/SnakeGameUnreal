@@ -38,23 +38,26 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Snake")
 	int32 Score = 0;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Snake")
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")
+	TArray<int32> PlayerScores;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")
 	int32 CurrentStageIndex = 0;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Snake")
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")
 	int32 FoodEatenThisStage = 0;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Snake")
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")
 	int32 PointsGainedThisStage = 0;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Snake")
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")
 	int32 PointsToClearStage = 0;
+
+	UPROPERTY(BlueprintAssignable, Category = "Snake|Score")
+	FOnScoreChangedSignature OnScoreChanged;
 
 	UPROPERTY(BlueprintAssignable, Category = "Snake")
 	FOnPhaseChangedSignature OnPhaseChanged;
-
-	UPROPERTY(BlueprintAssignable, Category = "Snake")
-	FOnScoreChangedSignature OnScoreChanged;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Snake")
 	ESnakeMatchPhase MatchPhase = ESnakeMatchPhase::None;
@@ -65,11 +68,39 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Snake|Battle")
 	ESnakeBattleResult BattleResult = ESnakeBattleResult::None;
 
-	void AddScore(int32 NewScore)
+
+	UFUNCTION(BlueprintPure, Category = "Snake|Score")
+	int32 GetPlayerScore(const int32 PlayerIndex) const
 	{
-		Score += NewScore;
+		return PlayerScores.IsValidIndex(PlayerIndex)
+			       ? PlayerScores[PlayerIndex]
+			       : 0;
+	}
+
+	void ResetScores(const int32 PlayerCount)
+	{
+		Score = 0;
+		PlayerScores.Init(0, FMath::Max(PlayerCount, 0));
 		OnScoreChanged.Broadcast(Score);
 	}
+
+	void AddScore(const int32 Amount)
+	{
+		Score += Amount;
+		OnScoreChanged.Broadcast(Score);
+	}
+
+	void AddScoreForPlayer(const int32 PlayerIndex, const int32 Amount)
+	{
+		if (PlayerScores.IsValidIndex(PlayerIndex))
+		{
+			PlayerScores[PlayerIndex] += Amount;
+		}
+
+		Score += Amount;
+		OnScoreChanged.Broadcast(Score);
+	}
+
 
 	void SetMatchPhase(ESnakeMatchPhase NewPhase)
 	{

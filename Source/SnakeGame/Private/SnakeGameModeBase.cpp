@@ -144,8 +144,8 @@ void ASnakeGameModeBase::StartPlayingRun()
 	// same with this part, should it be removed or modified? 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
-		GS->Score = 0;
-		GS->OnScoreChanged.Broadcast(0);
+		GS->ResetScores(ActiveLocalPlayerCount);
+		GS->BattleResult = ESnakeBattleResult::None;
 		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
 
 		// clear away the old end game message, for the temp placeholder UI but might bee good to keep this as a general cleaner anyway.   
@@ -634,6 +634,19 @@ void ASnakeGameModeBase::SpawnSnakeForPlayer(int32 PlayerIndex, const FIntPoint&
 	}
 }
 
+int32 ASnakeGameModeBase::GetPlayerIndexForSnake(const ASnakeGridwalkerPawn* Snake) const
+{
+	for (int32 Index = 0; Index < SpawnedSnakes.Num(); ++Index)
+	{
+		if (SpawnedSnakes[Index].Get() == Snake)
+		{
+			return Index;
+		}
+	}
+
+	return INDEX_NONE;
+}
+
 FIntPoint ASnakeGameModeBase::GetSpawnCellForPlayer(int32 PlayerIndex) const
 {
 	if (!GridManager)
@@ -801,6 +814,25 @@ void ASnakeGameModeBase::CompleteRun()
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
+		if (GS->PlayMode == ESnakeGameModeType::Versus)
+		{
+			const int32 Player0Score = GS->GetPlayerScore(0);
+			const int32 Player1Score = GS->GetPlayerScore(1);
+
+			if (Player0Score > Player1Score)
+			{
+				GS->BattleResult = ESnakeBattleResult::Player0Won;
+			}
+			else if (Player1Score > Player0Score)
+			{
+				GS->BattleResult = ESnakeBattleResult::Player1Won;
+			}
+			else
+			{
+				GS->BattleResult = ESnakeBattleResult::Draw;
+			}
+		}
+
 		GS->SetMatchPhase(ESnakeMatchPhase::Outro);
 	}
 
@@ -980,6 +1012,8 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 
 	// obtain score value from fruit
 	const int32 ScoreValue = Food->GetScoreValue();
+	const ASnakeGridwalkerPawn* ConsumingSnake = Cast<ASnakeGridwalkerPawn>(ConsumerActor);
+	const int32 ScoringPlayerIndex = GetPlayerIndexForSnake(ConsumingSnake);
 
 	// play food consumed effects
 	const FVector FeedbackLocation = Food->GetActorLocation();
@@ -998,7 +1032,7 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 
 	if (GS)
 	{
-		GS->AddScore(ScoreValue);
+		GS->AddScoreForPlayer(ScoringPlayerIndex, ScoreValue);
 		++GS->FoodEatenThisStage;
 		GS->PointsGainedThisStage += ScoreValue;
 
@@ -1062,6 +1096,28 @@ void ASnakeGameModeBase::HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake)
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
+		const int32 DeadPlayerIndex = GetPlayerIndexForSnake(DeadSnake);
+
+		if (GS->PlayMode == ESnakeGameModeType::Versus)
+		{
+			// Switch to something that takes scores into consideration. Maybe a victory evaluation function. 
+			// Currently, the surviving snake wins, and if both clear all levels then score decides winner 
+			switch (DeadPlayerIndex)
+			{
+			case 0:
+				GS->BattleResult = ESnakeBattleResult::Player1Won;
+				break;
+
+			case 1:
+				GS->BattleResult = ESnakeBattleResult::Player0Won;
+				break;
+
+			default:
+				GS->BattleResult = ESnakeBattleResult::Draw;
+				break;
+			}
+		}
+
 		GS->SetMatchPhase(ESnakeMatchPhase::Outro);
 
 		// temp text  to debug while setting up propper end screen 
