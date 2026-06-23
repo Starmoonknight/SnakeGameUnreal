@@ -45,6 +45,9 @@ public:
 	int32 CurrentStageIndex = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")
+	int32 TotalStagesAmount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")
 	int32 FoodEatenThisStage = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Snake|Score")

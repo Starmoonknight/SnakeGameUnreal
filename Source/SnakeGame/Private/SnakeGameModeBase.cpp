@@ -146,6 +146,7 @@ void ASnakeGameModeBase::StartPlayingRun()
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
 		GS->ResetScores(ActiveLocalPlayerCount);
+		GS->TotalStagesAmount = GetStageCount();
 		GS->BattleResult = ESnakeBattleResult::None;
 		GS->RunEndReason = ESnakeRunEndReason::None;
 		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
@@ -431,8 +432,7 @@ bool ASnakeGameModeBase::AnyOtherSnakeOnThisCell(const FIntPoint& Cell, const AS
 {
 	for (const ASnakeGridwalkerPawn* Snake : SpawnedSnakes)
 	{
-		if (IsValid(Snake) && Snake != IgnoredSnake &&
-			Snake->IsAlive() && Snake->IsSnakeAtCell(Cell))
+		if (IsValid(Snake) && Snake != IgnoredSnake && Snake->IsSnakeAtCell(Cell))
 		{
 			return true;
 		}
@@ -808,6 +808,7 @@ void ASnakeGameModeBase::LoadStage(int32 StageIndex)
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
 		GS->CurrentStageIndex = StageIndex;
+		GS->TotalStagesAmount = GetStageCount();
 		GS->FoodEatenThisStage = 0;
 		GS->PointsGainedThisStage = 0;
 		GS->PointsToClearStage = FMath::Max(StagePreset->StageSettings.FoodToClearStage, 1);

@@ -850,10 +850,11 @@ void ASnakeGridwalkerPawn::HandleCollisionOverlap(UPrimitiveComponent* Overlappe
 
 	if (const ASnakeGridwalkerPawn* OtherSnake = Cast<ASnakeGridwalkerPawn>(OtherActor))
 	{
-		if (OtherSnake->IsAlive())
-		{
-			HandleDeath();
-		}
+		//if (OtherSnake->IsAlive())
+		//{
+		//	HandleDeath();
+		//}
+		HandleDeath();
 		return;
 	}
 
