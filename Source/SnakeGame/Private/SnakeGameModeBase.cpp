@@ -12,6 +12,7 @@
 #include "GridSettingsDataAsset.h"
 
 #include "Engine/Engine.h"
+#include "TimerManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
@@ -138,7 +139,7 @@ void ASnakeGameModeBase::StartPlayingRun()
 	HideHUDWidget();
 	SetGameplayInputMode();
 
-	//BattleResult = ESnakeBattleResult::None;
+	bSnakeDeathResolutionPending = false;
 
 
 	// same with this part, should it be removed or modified? 
@@ -146,6 +147,7 @@ void ASnakeGameModeBase::StartPlayingRun()
 	{
 		GS->ResetScores(ActiveLocalPlayerCount);
 		GS->BattleResult = ESnakeBattleResult::None;
+		GS->RunEndReason = ESnakeRunEndReason::None;
 		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
 
 		// clear away the old end game message, for the temp placeholder UI but might bee good to keep this as a general cleaner anyway.   
@@ -228,6 +230,15 @@ int32 ASnakeGameModeBase::GetFinalScore() const
 {
 	const ASnakeGameState* GS = GetGameState<ASnakeGameState>();
 	return GS ? GS->Score : 0;
+}
+
+TArray<int32> ASnakeGameModeBase::GetFinalScoreMultiplayer() const
+{
+	const ASnakeGameState* GS = GetGameState<ASnakeGameState>();
+
+	return GS
+		       ? GS->GetAllPlayerScores(ActiveLocalPlayerCount)
+		       : TArray<int32>();
 }
 
 void ASnakeGameModeBase::StartSinglePlayerRun()
@@ -814,6 +825,8 @@ void ASnakeGameModeBase::CompleteRun()
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
+		GS->RunEndReason = ESnakeRunEndReason::AllStagesCleared;
+
 		if (GS->PlayMode == ESnakeGameModeType::Versus)
 		{
 			const int32 Player0Score = GS->GetPlayerScore(0);
@@ -999,6 +1012,75 @@ void ASnakeGameModeBase::StopGameLoop()
 	}
 }
 
+ESnakeBattleResult ASnakeGameModeBase::EvaluateBattleResultAfterDeath() const
+{
+	const bool bPlayer0Alive = SpawnedSnakes.IsValidIndex(0) &&
+		IsValid(SpawnedSnakes[0]) &&
+		SpawnedSnakes[0]->IsAlive();
+
+	const bool bPlayer1Alive = SpawnedSnakes.IsValidIndex(1) &&
+		IsValid(SpawnedSnakes[1]) &&
+		SpawnedSnakes[1]->IsAlive();
+
+	if (!bPlayer0Alive && !bPlayer1Alive)
+	{
+		return ESnakeBattleResult::Draw;
+	}
+
+	if (!bPlayer0Alive)
+	{
+		return ESnakeBattleResult::Player1Won;
+	}
+
+	if (!bPlayer1Alive)
+	{
+		return ESnakeBattleResult::Player0Won;
+	}
+
+	return ESnakeBattleResult::Draw;
+}
+
+void ASnakeGameModeBase::ResolveSnakeDeath()
+{
+	bSnakeDeathResolutionPending = false;
+
+	StopGameLoop();
+	HideHUDWidget();
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->RunEndReason = ESnakeRunEndReason::SnakeDied;
+
+		if (GS->PlayMode == ESnakeGameModeType::Versus)
+		{
+			GS->BattleResult = EvaluateBattleResultAfterDeath();
+		}
+
+		GS->SetMatchPhase(ESnakeMatchPhase::Outro);
+
+
+		// temp text  to debug while setting up propper end screen 
+		if (GEngine)
+		{
+			const FString MatchPhaseName =
+				StaticEnum<ESnakeMatchPhase>()->GetNameStringByValue(
+					static_cast<int64>(GS->MatchPhase)
+				);
+
+			GEngine->AddOnScreenDebugMessage(
+				2,
+				999.0f,
+				FColor::Red,
+				FString::Printf(TEXT("GAME OVER - Final Score: %d | PHASE: %s"),
+				                GS->Score,
+				                *MatchPhaseName)
+			);
+		}
+	}
+
+	ShowOutroWidget();
+}
+
 
 void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerActor)
 {
@@ -1044,13 +1126,28 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 					static_cast<int64>(GS->MatchPhase)
 				);
 
-			GEngine->AddOnScreenDebugMessage(
-				1,
-				999.0f,
-				FColor::Green,
-				FString::Printf(TEXT("Score: %d | PHASE: %s"),
-				                GS->Score,
-				                *MatchPhaseName));
+			if (GS->PlayMode == ESnakeGameModeType::Versus || GS->PlayMode == ESnakeGameModeType::Cooperative)
+			{
+				GEngine->AddOnScreenDebugMessage(
+					1,
+					999.0f,
+					FColor::Green,
+					FString::Printf(TEXT("Total: %d | P1: %d | P2: %d | PHASE: %s"),
+					                GS->Score,
+					                GS->GetPlayerScore(0),
+					                GS->GetPlayerScore(1),
+					                *MatchPhaseName));
+			}
+			else
+			{
+				GEngine->AddOnScreenDebugMessage(
+					1,
+					999.0f,
+					FColor::Green,
+					FString::Printf(TEXT("Score: %d | PHASE: %s"),
+					                GS->Score,
+					                *MatchPhaseName));
+			}
 		}
 	}
 
@@ -1079,65 +1176,32 @@ void ASnakeGameModeBase::HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake)
 		return;
 	}
 
-	StopGameLoop();
-	HideHUDWidget();
-
 	if (SnakeDeathSound)
 	{
 		UGameplayStatics::PlaySound2D(this, SnakeDeathSound);
 	}
 
-	if (SnakeDeathEffect)
+	if (SnakeDeathEffect && DeadSnake)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this,
 		                                               SnakeDeathEffect,
 		                                               DeadSnake->GetActorLocation());
 	}
 
-	if (ASnakeGameState* GS = GetSnakeGameState())
+	if (bSnakeDeathResolutionPending)
 	{
-		const int32 DeadPlayerIndex = GetPlayerIndexForSnake(DeadSnake);
-
-		if (GS->PlayMode == ESnakeGameModeType::Versus)
-		{
-			// Switch to something that takes scores into consideration. Maybe a victory evaluation function. 
-			// Currently, the surviving snake wins, and if both clear all levels then score decides winner 
-			switch (DeadPlayerIndex)
-			{
-			case 0:
-				GS->BattleResult = ESnakeBattleResult::Player1Won;
-				break;
-
-			case 1:
-				GS->BattleResult = ESnakeBattleResult::Player0Won;
-				break;
-
-			default:
-				GS->BattleResult = ESnakeBattleResult::Draw;
-				break;
-			}
-		}
-
-		GS->SetMatchPhase(ESnakeMatchPhase::Outro);
-
-		// temp text  to debug while setting up propper end screen 
-		if (GEngine)
-		{
-			const FString MatchPhaseName =
-				StaticEnum<ESnakeMatchPhase>()->GetNameStringByValue(
-					static_cast<int64>(GS->MatchPhase)
-				);
-
-			GEngine->AddOnScreenDebugMessage(
-				2,
-				999.0f,
-				FColor::Red,
-				FString::Printf(TEXT("GAME OVER - Final Score: %d | PHASE: %s"),
-				                GS->Score,
-				                *MatchPhaseName)
-			);
-		}
+		return;
 	}
 
-	ShowOutroWidget();
+	bSnakeDeathResolutionPending = true;
+
+	// wait to resolve a snakes death for one tick to allow all effects and moves of this round to play out 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(this, &ASnakeGameModeBase::ResolveSnakeDeath);
+	}
+	else
+	{
+		ResolveSnakeDeath();
+	}
 }

@@ -68,6 +68,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Snake|Battle")
 	ESnakeBattleResult BattleResult = ESnakeBattleResult::None;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Snake|Result")
+	ESnakeRunEndReason RunEndReason = ESnakeRunEndReason::None;
+
 
 	UFUNCTION(BlueprintPure, Category = "Snake|Score")
 	int32 GetPlayerScore(const int32 PlayerIndex) const
@@ -75,6 +78,23 @@ public:
 		return PlayerScores.IsValidIndex(PlayerIndex)
 			       ? PlayerScores[PlayerIndex]
 			       : 0;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Snake|Score")
+	TArray<int32> GetAllPlayerScores(const int32 PlayerCount) const
+	{
+		TArray<int32> OutScores;
+		OutScores.Init(0, FMath::Max(PlayerCount, 0));
+
+		for (int32 Index = 0; Index < OutScores.Num(); ++Index)
+		{
+			if (PlayerScores.IsValidIndex(Index))
+			{
+				OutScores[Index] = PlayerScores[Index];
+			}
+		}
+
+		return OutScores;
 	}
 
 	void ResetScores(const int32 PlayerCount)

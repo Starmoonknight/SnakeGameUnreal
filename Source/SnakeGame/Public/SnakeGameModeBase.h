@@ -6,6 +6,7 @@
 #include "GameFramework/GameModeBase.h"
 
 #include "GridDirectionTypes.h"
+#include "SnakeGameTypes.h"
 #include "SnakeGameModeBase.generated.h"
 
 class ASnakeGridwalkerPawn;
@@ -51,8 +52,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Snake|Flow")
 	int32 GetFinalScore() const;
 
-	//UFUNCTION(BlueprintPure, Category = "Snake|Flow")
-	//int32 GetFinalScoreMultiplayer() const;
+	UFUNCTION(BlueprintPure, Category = "Snake|Flow")
+	TArray<int32> GetFinalScoreMultiplayer() const;
 
 	UFUNCTION(BlueprintPure, Category = "Snake|Flow")
 	int32 GetCurrentStageNumber() const { return CurrentStageIndex + 1; }
@@ -165,6 +166,10 @@ private:
 	void StartGameLoop();
 	void StopGameLoop();
 	//void PauseGameLoop();
+
+	ESnakeBattleResult EvaluateBattleResultAfterDeath() const;
+	void ResolveSnakeDeath();
+	bool bSnakeDeathResolutionPending = false;
 
 	UFUNCTION()
 	void HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerActor);
