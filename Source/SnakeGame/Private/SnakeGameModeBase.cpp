@@ -811,12 +811,23 @@ void ASnakeGameModeBase::LoadStage(int32 StageIndex)
 		GS->TotalStagesAmount = GetStageCount();
 		GS->FoodEatenThisStage = 0;
 		GS->PointsGainedThisStage = 0;
-		GS->PointsToClearStage = FMath::Max(StagePreset->StageSettings.FoodToClearStage, 1);
+		GS->FoodToClearStage = FMath::Max(StagePreset->StageSettings.FoodToClearStage, 1);
 	}
 
 	SpawnSnakes();
 	RespawnFruit_Temp();
-	StartGameLoop();
+
+	// inner walls sometimes took an extra time to load, and last snake is fast which meant higher chance inst-death
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(
+			this,
+			&ASnakeGameModeBase::StartGameLoop);
+	}
+	else
+	{
+		StartGameLoop();
+	}
 }
 
 void ASnakeGameModeBase::CompleteRun()
@@ -1158,7 +1169,7 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 
 	const bool bStageComplete =
 		GS &&
-		GS->FoodEatenThisStage >= GS->PointsToClearStage;
+		GS->FoodEatenThisStage >= GS->FoodToClearStage;
 
 	if (bStageComplete)
 	{

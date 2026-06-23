@@ -119,6 +119,7 @@ private:
 	FIntPoint IndexToCellCoord(const int32 Index) const;
 
 	UStaticMesh* GetWallMeshToUse() const;
+	UStaticMesh* GetInnerWallMeshToUse() const;
 	UStaticMesh* GetFloorMeshToUse() const;
 
 	// board setup 
@@ -177,6 +178,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Assets",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMesh> WallMeshAsset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Assets",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMesh> InnerWallMeshAsset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Assets",
 		meta = (AllowPrivateAccess = "true"))

@@ -97,8 +97,8 @@ AGridManagerActor::AGridManagerActor()
 
 
 	// internal Walls
-	WallInstances = CreateDefaultSubobject<UInstancedStaticMeshComponent>(
-		TEXT("GeneratedWallInstances"));
+	WallInstances = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("GeneratedWallInstances"));
+
 	WallInstances->SetupAttachment(SceneRoot);
 	WallInstances->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	WallInstances->SetCollisionObjectType(ECC_WorldStatic);
@@ -244,6 +244,16 @@ UStaticMesh* AGridManagerActor::GetWallMeshToUse() const
 	return FallbackCubeMesh;
 }
 
+UStaticMesh* AGridManagerActor::GetInnerWallMeshToUse() const
+{
+	if (bHasFancyWalls && InnerWallMeshAsset)
+	{
+		return InnerWallMeshAsset;
+	}
+
+	return FallbackCubeMesh;
+}
+
 UStaticMesh* AGridManagerActor::GetFloorMeshToUse() const
 {
 	if (bHasFancyFloor && FloorMeshAsset)
@@ -274,7 +284,7 @@ void AGridManagerActor::GenerateInternalWalls()
 	}
 
 	WallInstances->ClearInstances();
-	WallInstances->SetStaticMesh(GetWallMeshToUse());
+	WallInstances->SetStaticMesh(GetInnerWallMeshToUse());
 
 	if (InternalWallSpacing < 2)
 	{

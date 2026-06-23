@@ -146,9 +146,9 @@ private:
 
 	void SpawnFruit_Destructive(const FIntPoint& Cell);
 
-	void LoadStage(int32 StageIndex);
 	const USnakeStageSettingsDataAsset* GetStagePreset(int32 StageIndex) const;
 	int32 GetStageCount() const;
+	void LoadStage(int32 StageIndex);
 	void CompleteStage();
 	void CompleteRun();
 
