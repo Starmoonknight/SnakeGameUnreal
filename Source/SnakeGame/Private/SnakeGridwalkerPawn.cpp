@@ -164,6 +164,8 @@ void ASnakeGridwalkerPawn::Tick(float DeltaTime)
 		return;
 	}
 
+	UpdateCameraLookAheadOffset(DeltaTime);
+
 	UpdateHeadTurnVisual(DeltaTime);
 	UpdateHeadMoveVisual(DeltaTime);
 
@@ -370,6 +372,7 @@ void ASnakeGridwalkerPawn::ApplyStartupSettings(const FSnakeStartupSettings& Set
 
 	CurrentDirection = Settings.StartingDirection;
 	PendingNextDirection = EGridDirection::None;
+	SnapCameraLookAheadOffset();
 
 	PendingGrowth = Settings.InitialPendingGrowth;
 }
@@ -628,6 +631,54 @@ void ASnakeGridwalkerPawn::SyncBodyVisuals()
 	}
 
 	UpdateBodyVisualTransforms();
+}
+
+FVector ASnakeGridwalkerPawn::GetCameraLookAheadOffset() const
+{
+	switch (CurrentDirection)
+	{
+	case EGridDirection::Up:
+		return FVector(CameraLookAheadDistance, 0.0f, 0.0f); //	Up    = +X
+
+	case EGridDirection::Down:
+		return FVector(-CameraLookAheadDistance, 0.0f, 0.0f); // Down  = -X
+
+	case EGridDirection::Right:
+		return FVector(0.0f, CameraLookAheadDistance, 0.0f); // Right = +Y
+
+	case EGridDirection::Left:
+		return FVector(0.0f, -CameraLookAheadDistance, 0.0f); //	Left  = -Y
+
+	case EGridDirection::None:
+	default:
+		return FVector::ZeroVector;
+	}
+}
+
+void ASnakeGridwalkerPawn::UpdateCameraLookAheadOffset(float DeltaTime)
+{
+	if (!SpringArm)
+	{
+		return;
+	}
+
+	const FVector DesiredOffset = GetCameraLookAheadOffset();
+
+	SpringArm->TargetOffset = FMath::VInterpTo(
+		SpringArm->TargetOffset,
+		DesiredOffset,
+		DeltaTime,
+		CameraLookAheadInterpSpeed);
+}
+
+void ASnakeGridwalkerPawn::SnapCameraLookAheadOffset()
+{
+	if (!SpringArm)
+	{
+		return;
+	}
+
+	SpringArm->TargetOffset = GetCameraLookAheadOffset();
 }
 
 

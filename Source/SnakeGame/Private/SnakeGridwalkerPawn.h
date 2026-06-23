@@ -189,6 +189,11 @@ private:
 	void UpdateBodyVisualTransforms();
 	void SyncBodyVisuals();
 
+	// Handle camera lagging behind when moving down at fast speed
+	FVector GetCameraLookAheadOffset() const;
+	void UpdateCameraLookAheadOffset(float DeltaTime);
+	void SnapCameraLookAheadOffset();
+
 	// Gameplay
 	bool TryConsumeGrowth();
 	EGridDirection DetermineDesiredDirection() const;
@@ -245,6 +250,14 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SnakeBody|Camera",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> Camera;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Camera",
+		meta = (AllowPrivateAccess = "true"))
+	float CameraLookAheadDistance = 350.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SnakeBody|Camera",
+		meta = (AllowPrivateAccess = "true"))
+	float CameraLookAheadInterpSpeed = 4.0f;
 
 	// Startup info-packages 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SnakeBody|Startup",

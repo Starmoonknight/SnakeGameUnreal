@@ -2,12 +2,10 @@
 
 
 #include "SnakeGameModeBase.h"
-//#include "SnakeGameInstance.h"
 #include "SnakeGameState.h"
 #include "SnakeGridwalkerPawn.h"
 #include "FoodActor.h"
 #include "GridManagerActor.h"
-//#include "SnakeGameTypes.h"
 
 #include "SnakeStageSettingsDataAsset.h"
 #include "SnakeSettingsDataAsset.h"
@@ -17,6 +15,9 @@
 #include "GameFramework/PlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
+#include "Sound/SoundBase.h"
 
 
 namespace
@@ -115,7 +116,7 @@ ASnakeGameState* ASnakeGameModeBase::GetSnakeGameState()
 	return GetGameState<ASnakeGameState>();
 }
 
-// IN PROGRESS
+
 void ASnakeGameModeBase::StartPlayingRun()
 {
 	HideMenuWidgets();
@@ -132,7 +133,7 @@ void ASnakeGameModeBase::StartPlayingRun()
 		GS->OnScoreChanged.Broadcast(0);
 		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
 
-		// clear away the old end game message 
+		// clear away the old end game message, for the temp placeholder UI but might bee good to keep this as a general cleaner anyway.   
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(
@@ -258,7 +259,14 @@ bool ASnakeGameModeBase::IsFoodAtCell(const FIntPoint& Cell) const
 		&& SpawnedFoodActor->GetFoodGridPosition() == Cell;
 }
 
-
+// TO-DO Note:
+// After full gameplay loop exists look for a way to handle multiple fruits existing at same time, 
+// timed spawn to a max cap of current active. 
+// Then either stop spawning and until a fruit has been eaten, starting new spawn-timer from that point.
+// OR, start spawning with SpawnFruit_Destructive that destroys the oldest fruit first. 
+// 
+// Probably change RespawnFruit_Temp and SpawnFruit_Destructive to be generic functions that can take in a list or object,
+// so that it can be re-used with other consumables, both boons and banes. 
 void ASnakeGameModeBase::RespawnFruit_Temp()
 {
 	FIntPoint NewFoodCell;
@@ -273,6 +281,63 @@ void ASnakeGameModeBase::RespawnFruit_Temp()
 	}
 
 	SpawnFruit_Destructive(NewFoodCell);
+}
+
+// can only be one fruit at this stage, so destroys previous if still active 
+void ASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
+{
+	if (!FoodActorClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode has no FoodClass assigned."));
+		return;
+	}
+
+	if (!GridManager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode has no GridManager assigned."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (IsValid(SpawnedFoodActor))
+	{
+		SpawnedFoodActor->OnFruitConsumed.RemoveDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
+
+		SpawnedFoodActor->Destroy();
+		SpawnedFoodActor = nullptr;
+	}
+
+	FVector SpawnLocation = GridManager->GridToWorld(Cell);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+
+	// will be placed inside floor at first
+	SpawnedFoodActor = World->SpawnActor<AFoodActor>(
+		FoodActorClass,
+		SpawnLocation,
+		FRotator::ZeroRotator,
+		SpawnParams);
+
+	if (!SpawnedFoodActor)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to spawn food."));
+		return;
+	}
+
+	// can only query the spawned actor's component size after it exists.
+	SpawnLocation.Z += SpawnedFoodActor->GetPlacementHalfHeight();
+
+	SpawnedFoodActor->SetFoodGridPosition(Cell, SpawnLocation);
+	SpawnedFoodActor->SetFoodValues(1, 1);
+	SpawnedFoodActor->SetActiveStatus(true);
+
+	SpawnedFoodActor->OnFruitConsumed.AddDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
 }
 
 
@@ -434,17 +499,10 @@ void ASnakeGameModeBase::EnsureLocalPlayers()
 void ASnakeGameModeBase::SpawnSnakes()
 {
 	SpawnedSnakes.Reset();
-	SpawnedSnakePawn = nullptr;
 
 	for (int32 PlayerIndex = 0; PlayerIndex < ActiveLocalPlayerCount; ++PlayerIndex)
 	{
 		SpawnSnakeForPlayer(PlayerIndex, GetSpawnCellForPlayer(PlayerIndex));
-	}
-
-	// temporary,compatibility with older single-snake code.  Remove after full transition 
-	if (!SpawnedSnakes.IsEmpty())
-	{
-		SpawnedSnakePawn = SpawnedSnakes[0];
 	}
 }
 
@@ -578,12 +636,40 @@ void ASnakeGameModeBase::ClearSpawnedActors()
 	}
 
 	SpawnedSnakes.Reset();
-	SpawnedSnakePawn = nullptr;
 }
 
 int32 ASnakeGameModeBase::GetStageCount() const
 {
 	return StagePresets.Num();
+}
+
+void ASnakeGameModeBase::CompleteStage()
+{
+	if (StageCompleteSound)
+	{
+		UGameplayStatics::PlaySound2D(this, StageCompleteSound);
+	}
+
+	if (StageCompleteEffect && GridManager)
+	{
+		const FIntPoint CentreCell(
+			GridManager->GetWidth() / 2,
+			GridManager->GetHeight() / 2);
+
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, StageCompleteEffect,
+		                                               GridManager->GridToWorld(CentreCell));
+	}
+
+	const int32 NextStageIndex = CurrentStageIndex + 1;
+
+	if (NextStageIndex < GetStageCount())
+	{
+		LoadStage(NextStageIndex);
+	}
+	else
+	{
+		CompleteRun();
+	}
 }
 
 const USnakeStageSettingsDataAsset* ASnakeGameModeBase::GetStagePreset(int32 StageIndex) const
@@ -675,64 +761,6 @@ void ASnakeGameModeBase::CompleteRun()
 	}
 
 	ShowOutroWidget();
-}
-
-
-// can only be one fruit at this stage, so destroys previous if still active 
-void ASnakeGameModeBase::SpawnFruit_Destructive(const FIntPoint& Cell)
-{
-	if (!FoodActorClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode has no FoodClass assigned."));
-		return;
-	}
-
-	if (!GridManager)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("SnakeGameMode has no GridManager assigned."));
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	if (IsValid(SpawnedFoodActor))
-	{
-		SpawnedFoodActor->OnFruitConsumed.RemoveDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
-
-		SpawnedFoodActor->Destroy();
-		SpawnedFoodActor = nullptr;
-	}
-
-	FVector SpawnLocation = GridManager->GridToWorld(Cell);
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-
-	// will be placed inside floor at first
-	SpawnedFoodActor = World->SpawnActor<AFoodActor>(
-		FoodActorClass,
-		SpawnLocation,
-		FRotator::ZeroRotator,
-		SpawnParams);
-
-	if (!SpawnedFoodActor)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to spawn food."));
-		return;
-	}
-
-	// can only query the spawned actor's component size after it exists.
-	SpawnLocation.Z += SpawnedFoodActor->GetPlacementHalfHeight();
-
-	SpawnedFoodActor->SetFoodGridPosition(Cell, SpawnLocation);
-	SpawnedFoodActor->SetFoodValues(1, 1);
-	SpawnedFoodActor->SetActiveStatus(true);
-
-	SpawnedFoodActor->OnFruitConsumed.AddDynamic(this, &ASnakeGameModeBase::HandleFruitConsumed);
 }
 
 
@@ -906,7 +934,21 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 		return;
 	}
 
+	// obtain score value from fruit
 	const int32 ScoreValue = Food->GetScoreValue();
+
+	// play food consumed effects
+	const FVector FeedbackLocation = Food->GetActorLocation();
+
+	if (FoodConsumedSound)
+	{
+		UGameplayStatics::PlaySound2D(this, FoodConsumedSound);
+	}
+
+	if (FoodConsumedEffect)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FoodConsumedEffect, FeedbackLocation);
+	}
 
 	ASnakeGameState* GS = GetSnakeGameState();
 
@@ -916,7 +958,7 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 		++GS->FoodEatenThisStage;
 		GS->PointsGainedThisStage += ScoreValue;
 
-		// temp text 
+		// temp text to debug while setting up propper HUD-UI
 		if (GEngine)
 		{
 			const FString MatchPhaseName =
@@ -944,16 +986,7 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 
 	if (bStageComplete)
 	{
-		const int32 NextStageIndex = CurrentStageIndex + 1;
-
-		if (NextStageIndex < GetStageCount())
-		{
-			LoadStage(NextStageIndex);
-		}
-		else
-		{
-			CompleteRun();
-		}
+		CompleteStage();
 
 		return;
 	}
@@ -971,11 +1004,23 @@ void ASnakeGameModeBase::HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake)
 	StopGameLoop();
 	HideHUDWidget();
 
+	if (SnakeDeathSound)
+	{
+		UGameplayStatics::PlaySound2D(this, SnakeDeathSound);
+	}
+
+	if (SnakeDeathEffect)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this,
+		                                               SnakeDeathEffect,
+		                                               DeadSnake->GetActorLocation());
+	}
+
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
 		GS->SetMatchPhase(ESnakeMatchPhase::Outro);
 
-		// temp text 
+		// temp text  to debug while setting up propper end screen 
 		if (GEngine)
 		{
 			const FString MatchPhaseName =

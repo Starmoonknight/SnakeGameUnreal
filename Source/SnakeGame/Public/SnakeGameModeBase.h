@@ -15,6 +15,8 @@ class USnakeStageSettingsDataAsset;
 class ASnakeGameState;
 
 class UUserWidget;
+class USoundBase;
+class UNiagaraSystem;
 
 
 /**
@@ -73,6 +75,24 @@ public:
 	void RespawnFruit_Temp();
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Feedback")
+	TObjectPtr<USoundBase> FoodConsumedSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Feedback")
+	TObjectPtr<USoundBase> SnakeDeathSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Feedback")
+	TObjectPtr<USoundBase> StageCompleteSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Feedback")
+	TObjectPtr<UNiagaraSystem> FoodConsumedEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Feedback")
+	TObjectPtr<UNiagaraSystem> SnakeDeathEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Feedback")
+	TObjectPtr<UNiagaraSystem> StageCompleteEffect;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|UI")
 	TSubclassOf<UUserWidget> MainMenuWidgetClass;
 
@@ -112,6 +132,7 @@ private:
 	void LoadStage(int32 StageIndex);
 	const USnakeStageSettingsDataAsset* GetStagePreset(int32 StageIndex) const;
 	int32 GetStageCount() const;
+	void CompleteStage();
 	void CompleteRun();
 
 	// UI 
@@ -145,11 +166,6 @@ private:
 		meta=(AllowPrivateAccess="true"))
 	TSubclassOf<ASnakeGridwalkerPawn> SnakePawnClass;
 
-	// NOTE: This will be decrepit soon when StagePresets will be used to handle setup, remove soon!  
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|SnakePawn",
-		meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USnakeSettingsDataAsset> SnakeStartupSettingsPreset;
-
 	UPROPERTY(EditAnywhere, Category = "Snake|FoodActor",
 		meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AFoodActor> FoodActorClass;
@@ -157,11 +173,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Snake|Grid",
 		meta=(AllowPrivateAccess="true"))
 	TSubclassOf<AGridManagerActor> GridManagerClass;
-
-	// NOTE: This will be decrepit soon when StagePresets will be used to handle setup, remove soon!  
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Grid",
-		meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UGridSettingsDataAsset> GridStartupSettingsPreset;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Snake|Grid",
 		meta=(AllowPrivateAccess="true"))
@@ -172,10 +183,9 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	int32 ActiveLocalPlayerCount = 2;
 
-	// Remove this soon? Since using SpawnedSnakes now.
-	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
-		meta=(AllowPrivateAccess="true"))
-	TObjectPtr<ASnakeGridwalkerPawn> SpawnedSnakePawn;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Snake|Runtime",
+		meta = (AllowPrivateAccess = "true"))
+	bool bUseSharedKeyboardControls = false;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Snake|Runtime",
 		meta = (AllowPrivateAccess="true"))
