@@ -202,6 +202,19 @@ void ASnakeGridwalkerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 			                          &ASnakeGridwalkerPawn::Input_OnMove);
 		}
 
+		if (SharedKeyboardPlayerOneMoveAction)
+		{
+			EnhancedInput->BindAction(SharedKeyboardPlayerOneMoveAction, ETriggerEvent::Triggered, this,
+			                          &ASnakeGridwalkerPawn::Input_OnSharedKeyboardPlayerOneMove);
+		}
+
+		if (SharedKeyboardPlayerTwoMoveAction)
+		{
+			EnhancedInput->BindAction(SharedKeyboardPlayerTwoMoveAction, ETriggerEvent::Triggered, this,
+			                          &ASnakeGridwalkerPawn::Input_OnSharedKeyboardPlayerTwoMove);
+		}
+
+
 		if (TestGrowthAction)
 		{
 			EnhancedInput->BindAction(TestGrowthAction, ETriggerEvent::Started, this,
@@ -326,6 +339,7 @@ void ASnakeGridwalkerPawn::RequestGrowth(const int32 Amount)
 	PendingGrowth += Amount;
 }
 
+
 void ASnakeGridwalkerPawn::ApplyVisualAssets()
 {
 	if (SnakeHeadMesh && HeadMeshAsset)
@@ -349,19 +363,60 @@ void ASnakeGridwalkerPawn::ApplyVisualAssets()
 
 void ASnakeGridwalkerPawn::SetupInputMapping()
 {
-	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController)
 	{
-		if (ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer())
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer->GetSubsystem<
+		UEnhancedInputLocalPlayerSubsystem>();
+	if (!InputSubsystem)
+	{
+		return;
+	}
+
+	// remove old mapping context for a new game / level stage 
+	if (DefaultMappingContext)
+	{
+		InputSubsystem->RemoveMappingContext(DefaultMappingContext);
+	}
+
+	if (SharedKeyboardMappingContext)
+	{
+		InputSubsystem->RemoveMappingContext(SharedKeyboardMappingContext);
+	}
+
+	const ASnakeGameModeBase* SnakeGameMode =
+		GetWorld() ? GetWorld()->GetAuthGameMode<ASnakeGameModeBase>() : nullptr;
+
+	const bool bSharedKeyboard =
+		SnakeGameMode && SnakeGameMode->IsUsingSharedKeyboardControls();
+
+	const bool bIsPlayerZero =
+		PlayerController == UGameplayStatics::GetPlayerController(this, 0);
+
+	// Setup controls for playing on a shared Keyboard 
+	if (bSharedKeyboard)
+	{
+		if (bIsPlayerZero && SharedKeyboardMappingContext)
 		{
-			if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer->GetSubsystem<
-				UEnhancedInputLocalPlayerSubsystem>())
-			{
-				if (DefaultMappingContext)
-				{
-					InputSubsystem->AddMappingContext(DefaultMappingContext, 0);
-				}
-			}
+			InputSubsystem->AddMappingContext(SharedKeyboardMappingContext, 0);
 		}
+
+		return;
+	}
+
+	// Setup normal controls
+	if (DefaultMappingContext)
+	{
+		InputSubsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
 }
 
@@ -424,15 +479,47 @@ EGridDirection ASnakeGridwalkerPawn::ResolveDirectionFromInput(const FVector2D& 
 	return EGridDirection::None;
 }
 
+void ASnakeGridwalkerPawn::QueueDirectionInput(EGridDirection Direction)
+{
+	if (Direction != EGridDirection::None)
+	{
+		PendingNextDirection = Direction;
+	}
+}
+
 void ASnakeGridwalkerPawn::Input_OnMove(const FInputActionValue& Value)
 {
 	RawMoveInput = Value.Get<FVector2D>();
 
 	// store active inputs only 
 	const EGridDirection InputDirection = ResolveDirectionFromInput(RawMoveInput);
-	if (InputDirection != EGridDirection::None)
+	QueueDirectionInput(InputDirection);
+}
+
+void ASnakeGridwalkerPawn::Input_OnSharedKeyboardPlayerOneMove(const FInputActionValue& Value)
+{
+	RouteSharedKeyboardMove(0, Value);
+}
+
+void ASnakeGridwalkerPawn::Input_OnSharedKeyboardPlayerTwoMove(const FInputActionValue& Value)
+{
+	RouteSharedKeyboardMove(1, Value);
+}
+
+void ASnakeGridwalkerPawn::RouteSharedKeyboardMove(int32 PlayerIndex, const FInputActionValue& Value)
+{
+	const FVector2D MoveInput = Value.Get<FVector2D>();
+	const EGridDirection InputDirection = ResolveDirectionFromInput(MoveInput);
+
+	if (InputDirection == EGridDirection::None)
 	{
-		PendingNextDirection = InputDirection;
+		return;
+	}
+
+	if (ASnakeGameModeBase* SnakeGameMode =
+		GetWorld() ? GetWorld()->GetAuthGameMode<ASnakeGameModeBase>() : nullptr)
+	{
+		SnakeGameMode->QueueDirectionForSnake(PlayerIndex, InputDirection);
 	}
 }
 

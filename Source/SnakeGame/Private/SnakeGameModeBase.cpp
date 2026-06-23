@@ -117,6 +117,21 @@ ASnakeGameState* ASnakeGameModeBase::GetSnakeGameState()
 }
 
 
+void ASnakeGameModeBase::QueueDirectionForSnake(int32 PlayerIndex, EGridDirection Direction)
+{
+	if (!SpawnedSnakes.IsValidIndex(PlayerIndex))
+	{
+		return;
+	}
+
+	if (!IsValid(SpawnedSnakes[PlayerIndex]))
+	{
+		return;
+	}
+
+	SpawnedSnakes[PlayerIndex]->QueueDirectionInput(Direction);
+}
+
 void ASnakeGameModeBase::StartPlayingRun()
 {
 	HideMenuWidgets();
@@ -218,6 +233,7 @@ int32 ASnakeGameModeBase::GetFinalScore() const
 void ASnakeGameModeBase::StartSinglePlayerRun()
 {
 	ActiveLocalPlayerCount = 1;
+	bUseSharedKeyboardControls = false;
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
@@ -230,6 +246,7 @@ void ASnakeGameModeBase::StartSinglePlayerRun()
 void ASnakeGameModeBase::StartCooperativeRun()
 {
 	ActiveLocalPlayerCount = 2;
+	bUseSharedKeyboardControls = false;
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{
@@ -242,6 +259,33 @@ void ASnakeGameModeBase::StartCooperativeRun()
 void ASnakeGameModeBase::StartVersusRun()
 {
 	ActiveLocalPlayerCount = 2;
+	bUseSharedKeyboardControls = false;
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->PlayMode = ESnakeGameModeType::Versus;
+	}
+
+	StartPlayingRun();
+}
+
+void ASnakeGameModeBase::StartCooperativeSharedKeyboardRun()
+{
+	ActiveLocalPlayerCount = 2;
+	bUseSharedKeyboardControls = true;
+
+	if (ASnakeGameState* GS = GetSnakeGameState())
+	{
+		GS->PlayMode = ESnakeGameModeType::Cooperative;
+	}
+
+	StartPlayingRun();
+}
+
+void ASnakeGameModeBase::StartVersusSharedKeyboardRun()
+{
+	ActiveLocalPlayerCount = 2;
+	bUseSharedKeyboardControls = true;
 
 	if (ASnakeGameState* GS = GetSnakeGameState())
 	{

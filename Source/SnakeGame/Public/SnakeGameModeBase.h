@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+
+#include "GridDirectionTypes.h"
 #include "SnakeGameModeBase.generated.h"
 
 class ASnakeGridwalkerPawn;
@@ -62,6 +64,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Snake|Flow")
 	void StartVersusRun();
 
+	UFUNCTION(BlueprintCallable, Category = "Snake|Flow")
+	void StartCooperativeSharedKeyboardRun();
+
+	UFUNCTION(BlueprintCallable, Category = "Snake|Flow")
+	void StartVersusSharedKeyboardRun();
+
 	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void StartPlayingRun();
 
@@ -73,6 +81,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Snake|flow")
 	void RespawnFruit_Temp();
+
+	bool IsUsingSharedKeyboardControls() const { return bUseSharedKeyboardControls; }
+
+	void QueueDirectionForSnake(int32 PlayerIndex, EGridDirection Direction);
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Feedback")

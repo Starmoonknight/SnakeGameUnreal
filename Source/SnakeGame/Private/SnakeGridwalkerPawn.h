@@ -152,6 +152,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Snake")
 	void RequestGrowth(int32 Amount = 1);
 
+	void QueueDirectionInput(EGridDirection Direction);
+
 #pragma endregion
 
 private:
@@ -169,6 +171,10 @@ private:
 
 	// Input Callbacks 
 	void Input_OnMove(const FInputActionValue& Value);
+	void Input_OnSharedKeyboardPlayerOneMove(const FInputActionValue& Value);
+	void Input_OnSharedKeyboardPlayerTwoMove(const FInputActionValue& Value);
+	void RouteSharedKeyboardMove(int32 PlayerIndex, const FInputActionValue& Value);
+
 	void Input_OnGrowPressed();
 	void Input_OnResetPressed();
 
@@ -279,6 +285,18 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> MoveAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputMappingContext> SharedKeyboardMappingContext;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> SharedKeyboardPlayerOneMoveAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> SharedKeyboardPlayerTwoMoveAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Snake|Input",
 		meta = (AllowPrivateAccess = "true"))
