@@ -866,7 +866,7 @@ void ASnakeGameModeBase::LoadStage(int32 StageIndex)
 			StartLevelDelayTimerHandle,
 			this,
 			&ASnakeGameModeBase::StartGameLoop,
-			0.1f,
+			0.3f,
 			false
 		);
 	}
