@@ -19,7 +19,9 @@ class ASnakeGameState;
 
 class UUserWidget;
 class USoundBase;
+class UAudioComponent;
 class UNiagaraSystem;
+class UNiagaraComponent;
 
 
 /**
@@ -177,6 +179,20 @@ private:
 	UFUNCTION()
 	void HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake);
 
+
+	// Effects Cleanup 
+	FTimerHandle StartLevelDelayTimerHandle;
+	FTimerHandle StageTransitionTimerHandle;
+	FTimerHandle OutroDelayTimerHandle;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UNiagaraComponent>> ActiveFeedbackEffects;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UAudioComponent>> ActiveFeedbackSounds;
+
+	void ClearActiveFeedback();
+	void ClearPendingGameTimers();
 
 	// Setup
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snake|Stages",

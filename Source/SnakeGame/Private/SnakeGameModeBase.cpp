@@ -18,6 +18,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "NiagaraComponent.h"
+#include "Components/AudioComponent.h"
 #include "Sound/SoundBase.h"
 
 
@@ -135,6 +137,9 @@ void ASnakeGameModeBase::QueueDirectionForSnake(int32 PlayerIndex, EGridDirectio
 
 void ASnakeGameModeBase::StartPlayingRun()
 {
+	ClearPendingGameTimers();
+	ClearActiveFeedback();
+
 	HideMenuWidgets();
 	HideHUDWidget();
 	SetGameplayInputMode();
@@ -202,11 +207,15 @@ void ASnakeGameModeBase::StartPlayingRun()
 
 void ASnakeGameModeBase::RestartRun()
 {
+	ClearPendingGameTimers();
+	ClearActiveFeedback();
 	StartPlayingRun();
 }
 
 void ASnakeGameModeBase::ReturnToMainMenu()
 {
+	ClearPendingGameTimers();
+	ClearActiveFeedback();
 	StopGameLoop();
 	ClearSpawnedActors();
 	HideHUDWidget();
@@ -713,9 +722,14 @@ int32 ASnakeGameModeBase::GetStageCount() const
 
 void ASnakeGameModeBase::CompleteStage()
 {
+	StopGameLoop();
+
 	if (StageCompleteSound)
 	{
-		UGameplayStatics::PlaySound2D(this, StageCompleteSound);
+		if (UAudioComponent* Sound = UGameplayStatics::SpawnSound2D(this, StageCompleteSound))
+		{
+			ActiveFeedbackSounds.Add(Sound);
+		}
 	}
 
 	if (StageCompleteEffect && GridManager)
@@ -724,15 +738,39 @@ void ASnakeGameModeBase::CompleteStage()
 			GridManager->GetWidth() / 2,
 			GridManager->GetHeight() / 2);
 
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, StageCompleteEffect,
-		                                               GridManager->GridToWorld(CentreCell));
+		if (UNiagaraComponent* Effect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this, StageCompleteEffect, GridManager->GridToWorld(CentreCell)))
+		{
+			ActiveFeedbackEffects.Add(Effect);
+		}
 	}
+
 
 	const int32 NextStageIndex = CurrentStageIndex + 1;
 
 	if (NextStageIndex < GetStageCount())
 	{
-		LoadStage(NextStageIndex);
+		// wait before loading next level to allow effects
+		if (UWorld* World = GetWorld())
+		{
+			FTimerDelegate LoadNextStageDelegate;
+			LoadNextStageDelegate.BindUObject(
+				this,
+				&ASnakeGameModeBase::LoadStage,
+				NextStageIndex
+			);
+
+			World->GetTimerManager().SetTimer(
+				StageTransitionTimerHandle,
+				LoadNextStageDelegate,
+				1.0f,
+				false
+			);
+		}
+		else
+		{
+			LoadStage(NextStageIndex);
+		}
 	}
 	else
 	{
@@ -752,6 +790,8 @@ const USnakeStageSettingsDataAsset* ASnakeGameModeBase::GetStagePreset(int32 Sta
 
 void ASnakeGameModeBase::LoadStage(int32 StageIndex)
 {
+	ClearActiveFeedback();
+
 	const USnakeStageSettingsDataAsset* StagePreset = GetStagePreset(StageIndex);
 
 	if (!StagePreset)
@@ -817,12 +857,16 @@ void ASnakeGameModeBase::LoadStage(int32 StageIndex)
 	SpawnSnakes();
 	RespawnFruit_Temp();
 
-	// inner walls sometimes took an extra time to load, and last snake is fast which meant higher chance inst-death
+	// wait a tiny amount of time to allow people to see the level that loaded in
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimerForNextTick(
+		World->GetTimerManager().SetTimer(
+			StartLevelDelayTimerHandle,
 			this,
-			&ASnakeGameModeBase::StartGameLoop);
+			&ASnakeGameModeBase::StartGameLoop,
+			0.1f,
+			false
+		);
 	}
 	else
 	{
@@ -1090,7 +1134,22 @@ void ASnakeGameModeBase::ResolveSnakeDeath()
 		}
 	}
 
-	ShowOutroWidget();
+
+	// wait before showing outro so death effects/sounds are visible 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			OutroDelayTimerHandle,
+			this,
+			&ASnakeGameModeBase::ShowOutroWidget,
+			0.5f,
+			false
+		);
+	}
+	else
+	{
+		ShowOutroWidget();
+	}
 }
 
 
@@ -1114,12 +1173,19 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 
 	if (FoodConsumedSound)
 	{
-		UGameplayStatics::PlaySound2D(this, FoodConsumedSound);
+		if (UAudioComponent* Sound = UGameplayStatics::SpawnSound2D(this, FoodConsumedSound))
+		{
+			ActiveFeedbackSounds.Add(Sound);
+		}
 	}
 
 	if (FoodConsumedEffect)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FoodConsumedEffect, FeedbackLocation);
+		if (UNiagaraComponent* Effect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this, FoodConsumedEffect, FeedbackLocation))
+		{
+			ActiveFeedbackEffects.Add(Effect);
+		}
 	}
 
 	ASnakeGameState* GS = GetSnakeGameState();
@@ -1190,14 +1256,19 @@ void ASnakeGameModeBase::HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake)
 
 	if (SnakeDeathSound)
 	{
-		UGameplayStatics::PlaySound2D(this, SnakeDeathSound);
+		if (UAudioComponent* Sound = UGameplayStatics::SpawnSound2D(this, SnakeDeathSound))
+		{
+			ActiveFeedbackSounds.Add(Sound);
+		}
 	}
 
 	if (SnakeDeathEffect && DeadSnake)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this,
-		                                               SnakeDeathEffect,
-		                                               DeadSnake->GetActorLocation());
+		if (UNiagaraComponent* Effect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this, SnakeDeathEffect, DeadSnake->GetActorLocation()))
+		{
+			ActiveFeedbackEffects.Add(Effect);
+		}
 	}
 
 	if (bSnakeDeathResolutionPending)
@@ -1215,5 +1286,40 @@ void ASnakeGameModeBase::HandleSnakeDeath(ASnakeGridwalkerPawn* DeadSnake)
 	else
 	{
 		ResolveSnakeDeath();
+	}
+}
+
+void ASnakeGameModeBase::ClearActiveFeedback()
+{
+	for (UNiagaraComponent* Effect : ActiveFeedbackEffects)
+	{
+		if (IsValid(Effect))
+		{
+			Effect->DeactivateImmediate();
+			Effect->DestroyComponent();
+		}
+	}
+
+	ActiveFeedbackEffects.Reset();
+
+	for (UAudioComponent* Sound : ActiveFeedbackSounds)
+	{
+		if (IsValid(Sound))
+		{
+			Sound->Stop();
+			Sound->DestroyComponent();
+		}
+	}
+
+	ActiveFeedbackSounds.Reset();
+}
+
+void ASnakeGameModeBase::ClearPendingGameTimers()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(StartLevelDelayTimerHandle);
+		World->GetTimerManager().ClearTimer(StageTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(OutroDelayTimerHandle);
 	}
 }
