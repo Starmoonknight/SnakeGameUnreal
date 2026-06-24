@@ -156,7 +156,8 @@ void ASnakeGameModeBase::StartPlayingRun()
 		GS->RunEndReason = ESnakeRunEndReason::None;
 		GS->SetMatchPhase(ESnakeMatchPhase::Playing);
 
-		// clear away the old end game message, for the temp placeholder UI but might bee good to keep this as a general cleaner anyway.   
+		// clear away the old end game message, for the temp placeholder UI but might be good to keep this as a general cleaner anyway.   
+		/*
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(
@@ -179,6 +180,7 @@ void ASnakeGameModeBase::StartPlayingRun()
 				                *MatchPhaseName)
 			);
 		}
+		*/
 	}
 
 
@@ -1116,6 +1118,7 @@ void ASnakeGameModeBase::ResolveSnakeDeath()
 
 
 		// temp text  to debug while setting up propper end screen 
+		/*
 		if (GEngine)
 		{
 			const FString MatchPhaseName =
@@ -1132,6 +1135,7 @@ void ASnakeGameModeBase::ResolveSnakeDeath()
 				                *MatchPhaseName)
 			);
 		}
+		*/
 	}
 
 
@@ -1197,6 +1201,7 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 		GS->PointsGainedThisStage += ScoreValue;
 
 		// temp text to debug while setting up propper HUD-UI
+		/*
 		if (GEngine)
 		{
 			const FString MatchPhaseName =
@@ -1227,6 +1232,7 @@ void ASnakeGameModeBase::HandleFruitConsumed(AFoodActor* Food, AActor* ConsumerA
 					                *MatchPhaseName));
 			}
 		}
+		*/
 	}
 
 	ScoreThisStage += ScoreValue;
